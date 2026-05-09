@@ -22,6 +22,26 @@ import numpy as np
 # diamond-grid convention used on the Resonance dashboard: each unit step in
 # x or y corresponds to one diagonal step on the chip. Qubit i (0-indexed)
 # maps to physical name QB{i+1}.
+# Exact IQM Garnet (Apollo) layout, transcribed from
+# iqm.cirq_iqm.devices.apollo.Apollo docstring. 20 qubits.
+GARNET_POSITIONS: dict[int, tuple[float, float]] = {
+    # row 6 (top)
+    19: (2, 6), 16: (4, 6),
+    # row 5
+    18: (1, 5), 15: (3, 5), 11: (5, 5),
+    # row 4
+    17: (0, 4), 14: (2, 4), 10: (4, 4), 6: (6, 4),
+    # row 3
+    13: (1, 3), 9: (3, 3), 5: (5, 3),
+    # row 2
+    12: (0, 2), 8: (2, 2), 4: (4, 2),
+    # row 1
+    7: (1, 1), 3: (3, 1), 1: (5, 1),
+    # row 0 (bottom)
+    2: (2, 0), 0: (4, 0),
+}
+
+
 EMERALD_POSITIONS: dict[int, tuple[float, float]] = {
     # row 10 (top)
     53: (1, 10), 50: (3, 10), 45: (5, 10), 38: (7, 10),
@@ -49,12 +69,13 @@ EMERALD_POSITIONS: dict[int, tuple[float, float]] = {
 
 
 def _device_layout(backend) -> dict[int, tuple[float, float]]:
-    """Hardcoded IQM Emerald layout if the backend has 54 qubits.
+    """Hardcoded IQM device layouts when the qubit count matches.
     Falls back to BFS-diamond walk for unknown topologies.
     """
     if backend.num_qubits == 54:
-        # Use the exact IQM dashboard layout
         return {i: (float(x), float(y)) for i, (x, y) in EMERALD_POSITIONS.items()}
+    if backend.num_qubits == 20:
+        return {i: (float(x), float(y)) for i, (x, y) in GARNET_POSITIONS.items()}
     # Fallback: BFS-diamond walk
     coupling: list[tuple[int, int]] = []
     seen: set[tuple[int, int]] = set()
