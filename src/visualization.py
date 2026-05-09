@@ -1,30 +1,27 @@
 """IQM-Resonance-style topology visualization.
 
-Colors qubits by a chosen metric (T1, T2, readout fidelity, 1Q fidelity).
-Highlights a chosen subset (the tree we picked) and the edges of the chosen
-graph state.
+Two main entry points:
+  - plot_device_topology(...)       static plot, optionally with a tree highlighted
+  - animate_tree_growth(...)        GIF showing how the chosen tree scales with n
 """
 
 from __future__ import annotations
+
+from collections import deque
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.lines import Line2D
 import numpy as np
-import rustworkx as rx
 
 
-# Hardcoded IQM Emerald qubit positions (54 qubits) — derived from a BFS over
-# the device coupling graph using diamond-grid offsets, with collision-aware
-# backtracking. Yields the rotated-square-lattice layout you see on the IQM
-# Resonance dashboard. Coordinates are in arbitrary units.
+# ---------- layout ----------
+
 def _device_layout(backend) -> dict[int, tuple[float, float]]:
-    """2D coordinates per qubit, computed once via a smart BFS that maps the
-    bipartite topology to a diamond grid. Each placed qubit's neighbours are
-    tried in 4 directions (NE, NW, SE, SW); we pick the direction that
-    minimises future placement conflicts (most-degrees-first heuristic).
+    """BFS-diamond layout: place qubits on a 45°-rotated grid by walking the
+    bipartite coupling graph and assigning (±1, ±1) offsets to each new
+    neighbour. Produces a clean planar embedding similar to the IQM dashboard.
     """
-    from collections import deque
     coupling: list[tuple[int, int]] = []
     seen: set[tuple[int, int]] = set()
     for a, b in backend.coupling_map:
@@ -44,7 +41,6 @@ def _device_layout(backend) -> dict[int, tuple[float, float]]:
 
     DIRS = [(1, 1), (-1, 1), (-1, -1), (1, -1)]   # NE, NW, SW, SE
 
-    # Start from a high-degree central qubit so the layout grows in all directions.
     start = max(adj, key=lambda x: len(adj[x]))
     pos: dict[int, tuple[int, int]] = {start: (0, 0)}
     used: set[tuple[int, int]] = {(0, 0)}
@@ -53,7 +49,6 @@ def _device_layout(backend) -> dict[int, tuple[float, float]]:
     while q:
         u = q.popleft()
         ux, uy = pos[u]
-        # Place each unplaced neighbour: pick first free diamond offset.
         for v in sorted(adj[u], key=lambda x: -len(adj.get(x, []))):
             if v in pos:
                 continue
@@ -66,7 +61,7 @@ def _device_layout(backend) -> dict[int, tuple[float, float]]:
                 q.append(v)
                 break
             else:
-                # All 4 diamond slots occupied — extend further out.
+                # All 4 diamond slots taken; spiral outwards
                 for r in range(2, 8):
                     placed = False
                     for dx, dy in [(r, 0), (-r, 0), (0, r), (0, -r),
@@ -81,10 +76,8 @@ def _device_layout(backend) -> dict[int, tuple[float, float]]:
                     if placed:
                         break
 
-    # Place any qubits not in the BFS-reached component (isolated/dangling).
     placed_set = set(pos.keys())
     isolated = [i for i in range(backend.num_qubits) if i not in placed_set]
-    # Find the bounding box of placed qubits
     if placed_set:
         max_x = max(p[0] for p in pos.values())
         for i, q_node in enumerate(isolated):
@@ -93,9 +86,36 @@ def _device_layout(backend) -> dict[int, tuple[float, float]]:
         for i, q_node in enumerate(isolated):
             pos[q_node] = (i, 0)
 
-    # Convert to floats
     return {k: (float(v[0]), float(v[1])) for k, v in pos.items()}
 
+
+# ---------- color helpers ----------
+
+def _color_for_metric(value: float | None, metric: str) -> tuple:
+    """Map a metric value to a viridis color. Returns gray if missing."""
+    if value is None:
+        return (0.8, 0.8, 0.8, 1.0)
+    if metric == "readout_fidelity":
+        norm = (value - 0.85) / 0.14
+    elif metric == "one_q_fidelity":
+        norm = (value - 0.99) / 0.01
+    elif metric == "t1":
+        norm = min((value * 1e6 - 5) / 95, 1.0)
+    elif metric == "t2":
+        norm = min((value * 1e6 - 1) / 49, 1.0)
+    else:
+        norm = float(value)
+    norm = max(0.0, min(1.0, norm))
+    return plt.cm.viridis(norm)
+
+
+def _cz_color(fid: float | None) -> tuple:
+    if fid is None:
+        return (0.78, 0.78, 0.78, 1.0)
+    return plt.cm.RdYlGn(max(0.0, min(1.0, (fid - 0.85) / 0.15)))
+
+
+# ---------- main static plot ----------
 
 def plot_device_topology(
     backend,
@@ -108,13 +128,11 @@ def plot_device_topology(
     ax=None,
     show_labels: bool = True,
     pos: dict[int, tuple[float, float]] | None = None,
+    spotlight: bool = True,
 ):
-    """Plot device topology in the IQM dashboard style.
+    """Render the device topology with an optional sub-tree highlighted.
 
-    metrics: per-qubit metrics from get_qubit_metrics; coloring uses metrics[i][color_by].
-    cz_fidelities: per-pair fidelity, used to color edge diamonds.
-    highlight_qubits: bigger marker + bold border.
-    highlight_edges: (a, b) physical edges drawn thicker and in red.
+    spotlight: if True, dim non-selected qubits/edges so the tree pops.
     """
     if pos is None:
         pos = _device_layout(backend)
@@ -124,96 +142,150 @@ def plot_device_topology(
         fig = ax.figure
 
     n = backend.num_qubits
-    highlight_qubits = set(highlight_qubits or [])
-    highlight_edge_set = {(min(a, b), max(a, b)) for a, b in (highlight_edges or [])}
+    hi_qubits = set(highlight_qubits or [])
+    hi_edges = {(min(a, b), max(a, b)) for a, b in (highlight_edges or [])}
+    has_highlights = bool(hi_qubits or hi_edges)
 
-    # --- edges ---
+    bg_alpha = 0.22 if (spotlight and has_highlights) else 0.65
+
+    # --- Layer 1: dim background edges ---
     for a, b in backend.coupling_map:
-        if a >= b:  # undirected, plot once
+        if a >= b:
             continue
         x1, y1 = pos[a]
         x2, y2 = pos[b]
         e = (a, b)
-
-        # Edge color based on CZ fidelity (or default gray)
-        if cz_fidelities and e in cz_fidelities:
-            cz_f = cz_fidelities[e]
-            edge_color = plt.cm.RdYlGn((cz_f - 0.85) / 0.15)  # 0.85→red, 1.0→green
-        else:
-            edge_color = "#cccccc"
-
-        is_highlight = e in highlight_edge_set
-        ax.plot([x1, x2], [y1, y2],
-                color="#e84545" if is_highlight else edge_color,
-                linewidth=4.5 if is_highlight else 1.3,
-                zorder=2 if is_highlight else 1,
-                alpha=1.0 if is_highlight else 0.55)
-
-        # Diamond mid-marker (IQM dashboard style)
+        if e in hi_edges:
+            continue   # drawn later in the highlight layer
+        col = _cz_color(cz_fidelities.get(e) if cz_fidelities else None)
+        ax.plot([x1, x2], [y1, y2], color=col, linewidth=1.5,
+                alpha=bg_alpha, zorder=1)
+        # tiny diamond mid-marker
         mx, my = (x1 + x2) / 2, (y1 + y2) / 2
-        diamond_color = edge_color if not is_highlight else "#e84545"
-        diamond = patches.RegularPolygon(
-            (mx, my), 4, radius=0.18, orientation=np.pi/4,
-            facecolor=diamond_color,
-            edgecolor="black" if is_highlight else "none",
-            linewidth=1.2 if is_highlight else 0,
-            zorder=3 if is_highlight else 2)
-        ax.add_patch(diamond)
+        d = patches.RegularPolygon((mx, my), 4, radius=0.16,
+                                    orientation=np.pi/4,
+                                    facecolor=col, edgecolor='none',
+                                    alpha=bg_alpha, zorder=2)
+        ax.add_patch(d)
 
-    # --- nodes ---
+    # --- Layer 2: dim background nodes ---
     for i in range(n):
+        if i in hi_qubits:
+            continue
         x, y = pos[i]
-        # Color by chosen metric
-        color = "#cccccc"
-        if metrics and i in metrics:
-            v = metrics[i].get(color_by)
-            if v is not None:
-                # Map color_by-specific range to [0,1]
-                if color_by == "readout_fidelity":
-                    norm = (v - 0.85) / 0.14   # 0.85 red → 0.99 green
-                elif color_by == "one_q_fidelity":
-                    norm = (v - 0.99) / 0.01
-                elif color_by == "t1":
-                    norm = min((v * 1e6 - 5) / 95, 1.0)   # 5µs red → 100µs green
-                elif color_by == "t2":
-                    norm = min((v * 1e6 - 1) / 49, 1.0)   # 1µs red → 50µs green
-                else:
-                    norm = min(max(float(v), 0), 1)
-                norm = max(0.0, min(1.0, norm))
-                color = plt.cm.viridis(norm)
-
-        is_highlight = i in highlight_qubits
-        size = 0.42 if is_highlight else 0.32
-        circle = patches.Circle(
-            (x, y), radius=size,
-            facecolor=color,
-            edgecolor="#e84545" if is_highlight else "white",
-            linewidth=3 if is_highlight else 1.5,
-            zorder=5)
+        col = _color_for_metric(
+            metrics.get(i, {}).get(color_by) if metrics else None, color_by)
+        circle = patches.Circle((x, y), radius=0.32, facecolor=col,
+                                 edgecolor='white', linewidth=1.0,
+                                 alpha=bg_alpha, zorder=3)
         ax.add_patch(circle)
-
         if show_labels:
-            ax.text(x, y, f"QB{i+1}", ha="center", va="center",
-                    fontsize=7 if is_highlight else 6.5,
-                    color="white", fontweight="bold", zorder=6)
+            ax.text(x, y, f"QB{i+1}", ha='center', va='center',
+                    fontsize=6.5, color='white', alpha=bg_alpha + 0.2,
+                    fontweight='bold', zorder=4)
 
-    ax.set_aspect("equal")
+    # --- Layer 3: highlighted edges (tree) ---
+    for (a, b) in hi_edges:
+        if a not in pos or b not in pos:
+            continue
+        x1, y1 = pos[a]
+        x2, y2 = pos[b]
+        # outer halo
+        ax.plot([x1, x2], [y1, y2], color='#fff4e0', linewidth=10,
+                alpha=0.9, zorder=10, solid_capstyle='round')
+        # bright inner line
+        ax.plot([x1, x2], [y1, y2], color='#ff3b3b', linewidth=5.5,
+                zorder=11, solid_capstyle='round')
+
+    # --- Layer 4: highlighted nodes ---
+    for i in hi_qubits:
+        x, y = pos[i]
+        col = _color_for_metric(
+            metrics.get(i, {}).get(color_by) if metrics else None, color_by)
+        # outer halo
+        ax.add_patch(patches.Circle((x, y), radius=0.55,
+                                     facecolor='none', edgecolor='#ff3b3b',
+                                     linewidth=4, zorder=12))
+        # inner colored disc
+        ax.add_patch(patches.Circle((x, y), radius=0.42,
+                                     facecolor=col, edgecolor='white',
+                                     linewidth=1.8, zorder=13))
+        if show_labels:
+            ax.text(x, y, f"QB{i+1}", ha='center', va='center',
+                    fontsize=8, color='white', fontweight='bold', zorder=14)
+
+    # --- Frame ---
+    ax.set_aspect('equal')
     ax.set_xticks([]); ax.set_yticks([])
-    for s in ["top", "right", "left", "bottom"]:
+    for s in ['top', 'right', 'left', 'bottom']:
         ax.spines[s].set_visible(False)
-    if title:
-        ax.set_title(title, fontsize=12, fontweight="bold")
+    ax.set_facecolor('#f5f5f7')
 
-    # Legend
-    if highlight_qubits or highlight_edge_set:
-        legend_elems = []
-        if highlight_qubits:
-            legend_elems.append(Line2D([0], [0], marker="o", color="w",
-                markerfacecolor="#888", markeredgecolor="#e84545",
-                markeredgewidth=2.5, markersize=12, label="Selected qubit"))
-        if highlight_edge_set:
-            legend_elems.append(Line2D([0], [0], color="#e84545", linewidth=3,
-                                        label="Tree edge (CZ gate)"))
-        ax.legend(handles=legend_elems, loc="upper right", fontsize=9, frameon=True)
+    # Padding around content
+    if pos:
+        xs = [p[0] for p in pos.values()]
+        ys = [p[1] for p in pos.values()]
+        pad = 1.2
+        ax.set_xlim(min(xs) - pad, max(xs) + pad)
+        ax.set_ylim(min(ys) - pad, max(ys) + pad)
+
+    if title:
+        ax.set_title(title, fontsize=13, fontweight='bold', pad=12)
+
+    if has_highlights:
+        legend_elems = [
+            Line2D([0], [0], marker='o', color='w',
+                   markerfacecolor='#888', markeredgecolor='#ff3b3b',
+                   markeredgewidth=2.5, markersize=14, label=f'Selected qubit ({len(hi_qubits)})'),
+            Line2D([0], [0], color='#ff3b3b', linewidth=4,
+                   label=f'Tree edge / CZ gate ({len(hi_edges)})'),
+        ]
+        ax.legend(handles=legend_elems, loc='upper right', fontsize=9,
+                  frameon=True, facecolor='white', framealpha=0.95)
 
     return fig, ax
+
+
+# ---------- animation ----------
+
+def animate_tree_growth(
+    backend,
+    trees_by_n: dict[int, dict],
+    metrics: dict[int, dict] | None = None,
+    cz_fidelities: dict[tuple[int, int], float] | None = None,
+    out_path: str = "gme_tree_growth.gif",
+    color_by: str = "readout_fidelity",
+    interval_ms: int = 1100,
+    title_prefix: str = "IQM Emerald — optimal spanning tree",
+):
+    """Build a GIF showing the chosen tree at each n in ascending order.
+
+    trees_by_n: dict of {n: tree_dict_from_select_best_tree}.
+    Saves to `out_path` (PIL writer). Returns the saved path.
+    """
+    import matplotlib.animation as animation
+
+    pos = _device_layout(backend)
+    sorted_ns = sorted(trees_by_n.keys())
+
+    fig, ax = plt.subplots(figsize=(11, 11))
+
+    def draw_frame(n_value: int):
+        ax.clear()
+        t = trees_by_n[n_value]
+        plot_device_topology(
+            backend, metrics=metrics, cz_fidelities=cz_fidelities,
+            color_by=color_by,
+            highlight_qubits=t['qubits'],
+            highlight_edges=t['edges'],
+            title=f'{title_prefix} — n = {n_value} qubits  (tree weight {t["weight"]:.3f})',
+            ax=ax, pos=pos, show_labels=True,
+            spotlight=True,
+        )
+
+    anim = animation.FuncAnimation(
+        fig, draw_frame, frames=sorted_ns, interval=interval_ms, repeat=True,
+    )
+    anim.save(out_path, writer=animation.PillowWriter(fps=max(1, 1000 // interval_ms)))
+    plt.close(fig)
+    return out_path
