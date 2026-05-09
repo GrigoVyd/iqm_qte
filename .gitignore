@@ -6,4 +6,5 @@ __pycache__/
 .claude/
 *.egg-info/
 .env
+.secrets/
 ETHQHack2026-main/

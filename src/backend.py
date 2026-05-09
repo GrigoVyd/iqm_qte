@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 
+import numpy as np
 import rustworkx as rx
 from qiskit import QuantumCircuit
 from qiskit_aer import AerSimulator
@@ -530,6 +531,146 @@ def select_best_tree(
         "n_starts_tried": len(good),
         "predicted_stab_fidelities": pred,
         "predicted_W": predicted_W,
+    }
+
+
+def select_best_tree_empirical(
+    backend,
+    target_n: int,
+    edge_fidelities: dict[tuple[int, int], float],
+    *,
+    min_edge_F: float = 0.5,
+    use_local_search: bool = True,
+) -> dict:
+    """Same multi-start Prim's MST search as `select_best_tree`, but using a
+    *measured* per-edge graph-state fidelity F_ij as the cost.
+
+    Edge weight  w(u,v) = 1 - F_ij  for any (u,v) in `edge_fidelities` with
+    F_ij >= `min_edge_F`. Edges below the threshold (and not natively present
+    in `edge_fidelities`) are excluded from the search.
+
+    `edge_fidelities` is the output of
+    `src.diagnostics.run_edge_map` post-processed via `fidelity_map`.
+
+    Returns the same dict shape as `select_best_tree` (qubits, edges,
+    logical_edges, weight, coloring, n_starts_tried). `predicted_W` here is
+    the sum of measured F_ij over tree edges — a direct empirical proxy for
+    GME witness quality (no calibration model involved).
+    """
+    if is_simulator(backend):
+        edges = [(i, i + 1) for i in range(target_n - 1)]
+        coloring = [i % 2 for i in range(target_n)]
+        return {
+            "qubits": list(range(target_n)),
+            "edges": edges,
+            "weight": 0.0,
+            "logical_edges": edges,
+            "coloring": coloring,
+            "n_starts_tried": 1,
+            "predicted_W": float(target_n),
+            "predicted_stab_fidelities": {i: 1.0 for i in range(target_n)},
+            "measured_edge_F": {e: 1.0 for e in edges},
+            "min_edge_F_used": 1.0,
+            "mean_edge_F_used": 1.0,
+        }
+
+    norm = lambda a, b: (min(a, b), max(a, b))
+    fids = {norm(a, b): F for (a, b), F in edge_fidelities.items()
+            if F >= min_edge_F}
+    if not fids:
+        raise ValueError("No edges above min_edge_F threshold.")
+
+    edge_weight = {e: 1.0 - F for e, F in fids.items()}
+    nbrs_unweighted: dict[int, set[int]] = {}
+    nbrs: dict[int, list[tuple[int, float]]] = {}
+    qubits_present: set[int] = set()
+    for (a, b), w in edge_weight.items():
+        qubits_present.update((a, b))
+        nbrs_unweighted.setdefault(a, set()).add(b)
+        nbrs_unweighted.setdefault(b, set()).add(a)
+        nbrs.setdefault(a, []).append((b, w))
+        nbrs.setdefault(b, []).append((a, w))
+
+    if len(qubits_present) < target_n:
+        raise ValueError(f"Only {len(qubits_present)} qubits in measured map "
+                          f"above F={min_edge_F}; need {target_n}.")
+
+    import heapq
+    best = None
+    for seed in qubits_present:
+        if not nbrs.get(seed):
+            continue
+        in_tree = {seed}
+        tree_edges: list[tuple[int, int, float]] = []
+        heap: list[tuple[float, int, int]] = []
+        for nb, w in nbrs[seed]:
+            heapq.heappush(heap, (w, seed, nb))
+        total_w = 0.0
+        while heap and len(in_tree) < target_n:
+            w, u, v = heapq.heappop(heap)
+            if v in in_tree:
+                continue
+            in_tree.add(v)
+            tree_edges.append((u, v, w))
+            total_w += w
+            for nb, w2 in nbrs[v]:
+                if nb not in in_tree:
+                    heapq.heappush(heap, (w2, v, nb))
+        if len(in_tree) != target_n:
+            continue
+        if best is None or total_w < best["weight"]:
+            best = {
+                "qubits": sorted(in_tree),
+                "phys_edges": [(a, b) for a, b, _ in tree_edges],
+                "weight": total_w,
+            }
+
+    if best is None:
+        raise ValueError(f"No connected {target_n}-qubit subtree above "
+                          f"F={min_edge_F}.")
+
+    if use_local_search:
+        in_tree_r, edges_r, w_r = _local_search_swap(
+            set(best["qubits"]),
+            [(a, b) for a, b in best["phys_edges"]],
+            edge_weight,
+            nbrs_unweighted,
+        )
+        if w_r < best["weight"]:
+            best = {"qubits": sorted(in_tree_r), "phys_edges": edges_r,
+                    "weight": w_r}
+
+    qubits = best["qubits"]
+    phys_to_log = {p: i for i, p in enumerate(qubits)}
+    logical_edges = [(phys_to_log[a], phys_to_log[b]) for a, b in best["phys_edges"]]
+
+    from src.circuits.graph_state import two_coloring
+    coloring = two_coloring(target_n, logical_edges)
+    if coloring is None:
+        raise RuntimeError("Spanning tree should always be 2-colorable.")
+
+    measured_F = {(min(a, b), max(a, b)): fids[(min(a, b), max(a, b))]
+                  for (a, b) in best["phys_edges"]}
+    # Empirical proxy for stabilizer fidelity: each qubit's local F is the
+    # geometric mean of incident measured edge fidelities. Sum -> predicted_W.
+    pred: dict[int, float] = {}
+    for i, p in enumerate(qubits):
+        incident = [F for e, F in measured_F.items() if p in e]
+        pred[i] = float(np.prod(incident) ** (1.0 / max(1, len(incident)))) if incident else 1.0
+    predicted_W = sum(pred.values())
+
+    return {
+        "qubits": qubits,
+        "edges": best["phys_edges"],
+        "logical_edges": logical_edges,
+        "weight": best["weight"],
+        "coloring": coloring,
+        "n_starts_tried": len(qubits_present),
+        "predicted_stab_fidelities": pred,
+        "predicted_W": predicted_W,
+        "measured_edge_F": measured_F,
+        "min_edge_F_used": min(measured_F.values()),
+        "mean_edge_F_used": float(np.mean(list(measured_F.values()))),
     }
 
 
