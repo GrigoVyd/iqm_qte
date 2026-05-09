@@ -43,14 +43,14 @@ def correction_factors_from_metrics(qubit_metrics: dict[int, dict]) -> dict[int,
     return factors
 
 
-def apply_qrem_to_stabilizers(
+def apply_qrem_to_stabilizers_grid(
     stabilizer_values: dict[int, float],
     rows: int,
     cols: int,
     layout: list[int],
     correction_factors: dict[int, float],
 ) -> dict[int, float]:
-    """Apply parity-QREM to per-qubit stabilizer expectations.
+    """Apply parity-QREM to per-qubit stabilizer expectations on a rect grid.
 
     stabilizer_values: {logical_qubit: ⟨g_i⟩} from compute_gme_witness.
     layout: physical qubit per logical index (logical i → layout[i]).
@@ -75,3 +75,42 @@ def apply_qrem_to_stabilizers(
                 factor *= correction_factors.get(p, 1.0)
             out[q_logical] = stabilizer_values[q_logical] * factor
     return out
+
+
+def apply_qrem_to_stabilizers_graph(
+    stabilizer_values: dict[int, float],
+    n: int,
+    logical_edges: list[tuple[int, int]],
+    layout: list[int],
+    correction_factors: dict[int, float],
+) -> dict[int, float]:
+    """Apply parity-QREM to per-qubit stabilizer expectations on an arbitrary
+    bipartite graph state.
+
+    For each stabilizer g_i, multiplies by ∏_(j ∈ {i} ∪ N(i)) c_(layout[j])
+    where N(i) are the graph neighbours of qubit i.
+
+    Args:
+        stabilizer_values: {logical_qubit_idx: ⟨g_i⟩_raw}
+        n: number of logical qubits
+        logical_edges: graph edges in 0..n-1 indexing
+        layout: physical qubit per logical index (logical i → layout[i])
+        correction_factors: {physical_qubit_idx: c_i}
+
+    Returns:
+        {logical_qubit_idx: ⟨g_i⟩_mitigated}
+    """
+    from src.circuits.graph_state import neighbours_from_edges
+    nbrs = neighbours_from_edges(n, logical_edges)
+    out: dict[int, float] = {}
+    for q in range(n):
+        involved_logical = [q] + nbrs[q]
+        factor = 1.0
+        for lq in involved_logical:
+            factor *= correction_factors.get(layout[lq], 1.0)
+        out[q] = stabilizer_values[q] * factor
+    return out
+
+
+# Backwards-compat alias for the rectangular notebook
+apply_qrem_to_stabilizers = apply_qrem_to_stabilizers_grid

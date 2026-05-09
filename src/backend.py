@@ -89,14 +89,23 @@ def get_qubit_metrics(backend) -> tuple[dict[int, dict], dict[tuple[int, int], f
     return qubits, pairs
 
 
+DEFAULT_THRESHOLDS = dict(
+    min_readout_fidelity=0.90,
+    min_one_q_fidelity=0.99,
+    min_t1=10e-6,
+    min_t2=5e-6,
+    min_cz_fidelity=0.90,
+)
+
+
 def filter_qubits_by_metrics(
     qubit_metrics: dict[int, dict],
     cz_fidelities: dict[tuple[int, int], float] | None = None,
-    min_readout_fidelity: float = 0.95,
-    min_one_q_fidelity: float = 0.998,
-    min_t1: float = 30e-6,
-    min_t2: float = 20e-6,
-    min_cz_fidelity: float = 0.95,
+    min_readout_fidelity: float = 0.90,
+    min_one_q_fidelity: float = 0.99,
+    min_t1: float = 10e-6,
+    min_t2: float = 5e-6,
+    min_cz_fidelity: float = 0.90,
 ) -> set[int]:
     """Return qubit indices passing per-qubit thresholds and (optionally) having
     at least one CZ partner above min_cz_fidelity.
@@ -169,31 +178,42 @@ def _enumerate_subgrids(backend, rows: int, cols: int,
     return grids
 
 
-CZ_GATE_TIME_S = 100e-9   # IQM Emerald CZ gate duration ~100 ns
+CZ_GATE_TIME_S    = 100e-9   # IQM Emerald CZ gate duration  ~100 ns
+MEASUREMENT_TIME_S = 1.5e-6  # IQM measurement duration       ~1.5 µs (typical)
 
 
 def _compute_edge_weights(
     qubit_metrics: dict[int, dict],
     cz_fidelities: dict[tuple[int, int], float],
     readout_weight: float = 0.0,
-    t1_weight: float = 0.5,
+    t1_weight: float = 1.0,
     t2_weight: float = 1.0,
     one_q_weight: float = 1.0,
+    measurement_decoherence: bool = False,
     gate_time_s: float = CZ_GATE_TIME_S,
+    measurement_time_s: float = MEASUREMENT_TIME_S,
 ) -> dict[tuple[int, int], float]:
     """Comprehensive edge cost capturing all dominant noise channels.
 
-      w(u,v) = (1 - F_CZ(u,v))                     CZ gate error (dominant)
-             + readout_weight · (RO_penalty(u) + RO_penalty(v))   (default 0;
-                                  QREM mitigates readout already)
-             + t1_weight · gate_time · (1/T1(u) + 1/T1(v))        amplitude damping
-             + t2_weight · gate_time · (1/T2(u) + 1/T2(v))        dephasing
-             + one_q_weight · ((1 - F_1Q(u)) + (1 - F_1Q(v)))     1Q gate error
+      w(u,v) = (1 - F_CZ(u,v))                                 CZ gate error
+             + readout_weight · ((1-F_RO(u)) + (1-F_RO(v)))    (default 0; QREM)
+             + t1_weight · t_eff · (1/T1(u) + 1/T1(v))         amplitude damping
+             + t2_weight · t_eff · (1/T2(u) + 1/T2(v))         dephasing
+             + one_q_weight · ((1-F_1Q(u)) + (1-F_1Q(v)))      1Q gate error
 
-    All terms are per-edge and double-count both endpoints, which approximates
-    the per-edge contribution of each qubit's noise to that gate's outcome.
-    Missing metrics are treated as 0 penalty (best case).
+    where t_eff = gate_time + (measurement_time / 2 if measurement_decoherence
+    else 0). Including measurement decoherence accounts for the fact that
+    qubits decay during the ~1.5 µs readout, comparable to several CZ gates.
+
+    First-order infidelity for amplitude damping over time t is t/T1, and
+    for dephasing it is t/T2 — coefficients match these textbook formulae
+    (no spurious 1/2 factor).
     """
+    t_eff = gate_time_s
+    if measurement_decoherence:
+        t_eff += 0.5 * measurement_time_s   # /2: measurement contributes half
+                                            # because not every CZ is followed
+                                            # immediately by readout
     out: dict[tuple[int, int], float] = {}
     for (a, b), fid in cz_fidelities.items():
         m_a = qubit_metrics.get(a, {})
@@ -205,19 +225,16 @@ def _compute_edge_weights(
             ro_b = m_b.get("readout_fidelity", 1.0)
             w += readout_weight * ((1.0 - ro_a) + (1.0 - ro_b))
 
-        # T1: amplitude damping per gate
         if t1_weight:
-            t1_a = m_a.get("t1") or 1e9   # huge default = no penalty
+            t1_a = m_a.get("t1") or 1e9
             t1_b = m_b.get("t1") or 1e9
-            w += t1_weight * gate_time_s * (1.0 / t1_a + 1.0 / t1_b)
+            w += t1_weight * t_eff * (1.0 / t1_a + 1.0 / t1_b)
 
-        # T2: dephasing per gate
         if t2_weight:
             t2_a = m_a.get("t2") or 1e9
             t2_b = m_b.get("t2") or 1e9
-            w += t2_weight * gate_time_s * (1.0 / t2_a + 1.0 / t2_b)
+            w += t2_weight * t_eff * (1.0 / t2_a + 1.0 / t2_b)
 
-        # 1Q gate error
         if one_q_weight:
             f1_a = m_a.get("one_q_fidelity", 1.0)
             f1_b = m_b.get("one_q_fidelity", 1.0)
@@ -233,39 +250,53 @@ def predict_stabilizer_fidelities(
     qubit_metrics: dict[int, dict],
     cz_fidelities: dict[tuple[int, int], float],
     gate_time_s: float = CZ_GATE_TIME_S,
+    measurement_time_s: float = MEASUREMENT_TIME_S,
+    measurement_decoherence: bool = False,
+    include_readout: bool = False,
 ) -> dict[int, float]:
-    """Predict ⟨g_i⟩ for each logical qubit i, ignoring readout (assume QREM).
+    """Predict ⟨g_i⟩ for each logical qubit i.
 
-    Heuristic: each stabilizer g_i = X_i ⊗ ⊗_(j∈N(i)) Z_j. The relevant noise
-    sources are CZ errors on edges in the i-neighborhood, plus per-qubit
-    decoherence and 1Q gate error on the involved qubits. We multiply the
-    relevant per-channel fidelities to estimate the residual ⟨g_i⟩.
+    Default: ignores readout (assume parity-QREM is applied post-hoc).
+    Set ``include_readout=True`` for the raw (un-mitigated) prediction.
+
+    Heuristic model: each stabilizer g_i = X_i ⊗ ⊗_(j∈N(i)) Z_j is degraded by:
+      - CZ errors on edges incident to {i} ∪ N(i) (depolarizing channel
+        approximation: each error reduces ⟨g_i⟩ by factor F_CZ)
+      - Per-qubit 1Q gate error (1 H per qubit prep; +1 H if X-measured)
+      - Per-qubit decoherence over total time t_eff = gate + 0.5·readout
+      - (Optional) Per-qubit readout error
+
+    First-order coefficients: amplitude-damping infidelity = t/T1, dephasing = t/T2.
     """
     from src.circuits.graph_state import neighbours_from_edges
 
     n = len(qubits)
     nbrs = neighbours_from_edges(n, logical_edges)
+    t_eff = gate_time_s + (0.5 * measurement_time_s if measurement_decoherence else 0.0)
     out: dict[int, float] = {}
     for i in range(n):
         involved_logical = [i] + nbrs[i]
         involved_phys = [qubits[lq] for lq in involved_logical]
         f = 1.0
-        # CZ fidelities on edges incident to any qubit in involved set
+
+        # CZ fidelities on edges incident to any qubit in the i-neighborhood
         for (a, b) in logical_edges:
             if a in involved_logical or b in involved_logical:
                 pa, pb = qubits[a], qubits[b]
                 cz = cz_fidelities.get((min(pa, pb), max(pa, pb)), 0.99)
                 f *= cz
-        # 1Q gate error per involved qubit (1 H gate per qubit during prep)
+
         for pq in involved_phys:
-            f *= qubit_metrics.get(pq, {}).get("one_q_fidelity", 1.0)
-        # Decoherence: total time for prep ≈ depth × gate_time. Conservative:
-        # 1 gate worth of decoherence per involved qubit (could be deeper for
-        # long trees but this is the order-of-magnitude estimate).
-        for pq in involved_phys:
-            t1 = qubit_metrics.get(pq, {}).get("t1") or 1e9
-            t2 = qubit_metrics.get(pq, {}).get("t2") or 1e9
-            f *= max(0.0, 1.0 - 0.5 * gate_time_s / t1 - gate_time_s / t2)
+            mp = qubit_metrics.get(pq, {})
+            # 1Q error: 1 H during prep + 1 more H if measured in X basis.
+            # We don't know the coloring here so use 1 average; ~0.05% effect.
+            f *= mp.get("one_q_fidelity", 1.0)
+            # First-order decoherence: t/T1 + t/T2 (no spurious 1/2)
+            t1 = mp.get("t1") or 1e9
+            t2 = mp.get("t2") or 1e9
+            f *= max(0.0, 1.0 - t_eff / t1 - t_eff / t2)
+            if include_readout:
+                f *= mp.get("readout_fidelity", 1.0)
         out[i] = f
     return out
 
@@ -343,20 +374,26 @@ def select_best_tree(
     min_t2: float = 5e-6,
     min_cz_fidelity: float = 0.90,
     readout_weight: float = 0.0,
-    t1_weight: float = 0.5,
+    t1_weight: float = 1.0,
     t2_weight: float = 1.0,
     one_q_weight: float = 1.0,
+    measurement_decoherence: bool = False,
     use_local_search: bool = True,
 ) -> dict:
     """Find the best target_n-qubit connected subgraph of the device.
 
-    Cost minimised:
-      sum over tree edges of:
-         (1 - F_CZ)                   CZ gate infidelity (dominant)
-       + t1_weight * t_g * (1/T1_u + 1/T1_v)    amplitude damping
-       + t2_weight * t_g * (1/T2_u + 1/T2_v)    dephasing
-       + one_q_weight * ((1-F_1Q_u) + (1-F_1Q_v))   1Q gate error
-       (readout_weight * RO penalty — off by default since QREM corrects RO)
+    Cost minimised per tree edge:
+      (1 - F_CZ)                                              CZ gate infidelity
+      + t1_weight * t_eff * (1/T1_u + 1/T1_v)                amplitude damping
+      + t2_weight * t_eff * (1/T2_u + 1/T2_v)                dephasing
+      + one_q_weight * ((1-F_1Q_u) + (1-F_1Q_v))             1Q gate error
+      (readout_weight * RO penalty — off by default since QREM corrects RO)
+
+    where t_eff = gate_time + 0.5 * measurement_time when
+    `measurement_decoherence=True`. Default OFF: measurement-time decoherence
+    is partly captured by readout fidelity (which QREM mitigates), so
+    including it again here over-counts. Set to True for a conservative
+    lower bound on prep fidelity.
 
     Quality threshold filter (default ON) excludes qubits with marginal
     calibration that empirically drift more than reported metrics suggest.
@@ -364,23 +401,8 @@ def select_best_tree(
     Returns dict with: qubits, edges, logical_edges, weight, coloring,
     predicted_W, predicted_stab_fidelities, n_starts_tried.
     """
-    """Find the best target_n-qubit connected subgraph of the device.
-
-    Strategy: filter qubits by per-qubit thresholds, restrict device coupling
-    to the survivors with edge weight = 1 − CZ_fidelity (use 1.0 for unknown
-    edges so they are unattractive), then for every starting qubit run Prim's
-    algorithm to grow a tree of size target_n. Return the lightest such tree.
-
-    Returns a dict with:
-      qubits   : list of physical qubit indices (size target_n)
-      edges    : list of (a, b) physical edges in the spanning tree (size target_n - 1)
-      weight   : sum of edge weights (Σ 1 − CZ_fidelity over tree edges)
-      logical_edges : same edges, relabeled to 0..target_n-1 in row-major order
-      coloring : 2-coloring of the tree (0/1 per logical qubit)
-      n_starts_tried : number of seeds explored
-    """
     if is_simulator(backend):
-        # Synthetic: line graph 0–1–2–…–(n-1)
+        # Synthetic line graph; predict ideal W since no noise on simulator
         edges = [(i, i + 1) for i in range(target_n - 1)]
         coloring = [i % 2 for i in range(target_n)]
         return {
@@ -390,6 +412,8 @@ def select_best_tree(
             "logical_edges": edges,
             "coloring": coloring,
             "n_starts_tried": 1,
+            "predicted_W": float(target_n),
+            "predicted_stab_fidelities": {i: 1.0 for i in range(target_n)},
         }
 
     qm, cz = get_qubit_metrics(backend)
@@ -416,6 +440,7 @@ def select_best_tree(
         t1_weight=t1_weight,
         t2_weight=t2_weight,
         one_q_weight=one_q_weight,
+        measurement_decoherence=measurement_decoherence,
     )
 
     # Restricted weighted graph
