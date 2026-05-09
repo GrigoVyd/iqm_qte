@@ -8,85 +8,90 @@ We deploy **two qualitatively distinct entanglement witnesses on three different
 
 ### 1. Graph-state GME witness (main result)
 
-Optimal spanning-tree graph state + parity-QREM + zero-noise extrapolation. Garnet, full chip. The physical maximum is $W=n$ (perfect state); the GME bound is $W=n-1$.
+Optimal spanning-tree graph state + parity-QREM + zero-noise extrapolation. Both devices, sweeps from `experiments/witness_my_entanglement.ipynb`. The physical maximum is $W=n$ (perfect state); the GME bound is $W=n-1$.
 
-| n | bound (n−1) | W +QREM | σ +QREM | W +QREM+ZNE (raw / clipped to n) | σ +QREM+ZNE | GME |
+**Garnet (full 20-qubit chip):**
+
+| n | bound (n−1) | W +QREM | σ +QREM | W +QREM+ZNE (raw / clipped) | σ +QREM+ZNE | GME |
 |---|---|---|---|---|---|---|
-| 6 | 5 | 5.99 | +15.6 | 6.13 / **6.00** | +23.2 | ✓ |
-| 8 | 7 | 8.04 | +14.2 | 8.32 / **8.00** | +20.8 | ✓ |
-| 12 | 11 | 11.70 | +7.8 | 12.25 / **12.00** | +15.1 | ✓ |
-| 16 | 15 | 15.53 | +5.2 | 16.40 / **16.00** | +13.9 | ✓ |
-| **20** | **19** | **19.18** | **+1.6** | 20.38 / **20.00** | **+13.1** | **✓** |
+| 6 | 5 | 6.04 | +19.1 | 6.17 / **6.00** | +28.2 | ✓ |
+| 12 | 11 | 11.98 | +12.6 | 12.52 / **12.00** | +24.5 | ✓ |
+| **20** | **19** | **19.25** | **+2.5** | 20.45 / **20.00** | **+15.0** | **✓** |
 
-The certified result is **+QREM** (physical at every $n$, already above the GME bound). +QREM+ZNE pushes the significance further but the linear extrapolation overshoots the physical ceiling $W=n$ by 1–2%, which we read as the systematic error of the linear noise model — not an unphysical signal. The clipped column is what we quote as our best estimate of the noiseless witness.
+**Emerald (54q):**
+
+| n | bound (n−1) | W +QREM | σ +QREM | W +QREM+ZNE (raw / clipped) | σ +QREM+ZNE | GME |
+|---|---|---|---|---|---|---|
+| 6 | 5 | 6.06 | +19.4 | 6.34 / **6.00** | +35.7 | ✓ |
+| 12 | 11 | 11.88 | +11.3 | 12.84 / **12.00** | +28.2 | ✓ |
+| 20 | 19 | 18.11 | −8.9 | 19.75 / **19.75** | **+7.6** | ✓ (after ZNE) |
+
+The certified result is **+QREM** (physical at every $n$, above the GME bound on Garnet at every n including the full chip). On Emerald n=20 the calibration-cost tree picks a region where +QREM alone is below the bound; ZNE then lifts the witness above it at +7.6σ. +QREM+ZNE values that exceed the physical ceiling $W=n$ are clipped — the 1–2% overshoot is the linear-fit systematic. Empirical-edge-fidelity routing (§2.4) closes most of the n=20 Emerald gap, see below.
 
 Theory: Tóth & Gühne 2005 PRL+PRA. Witness = $\sum_i \langle g_i\rangle \le n-1$ for any biseparable state. We generalised from rectangular clusters to **arbitrary 2-colorable graph states**, picking minimum-weight spanning trees on the live device topology — a tree on $n$ qubits has only $n-1$ CZ gates (vs $\sim 2n$ for a grid), so prep fidelity stays high.
 
-### 2. GHZ vs W state fidelity comparison (variety)
+### 2. GHZ vs W state fidelity comparison (legacy variety result)
 
-Same Diker / F-gate W-state preparation, different N. Direct hardware fidelity comparison on Emerald & Garnet:
+Earlier iteration compared the F-gate W preparation against an H+CNOT-ladder GHZ at matched n on both devices. W stayed higher than GHZ at every n past ~5 qubits (e.g. n=19 on Emerald: F_W=0.19 vs F_GHZ=0.09) — empirical demonstration of GHZ fragility (single-qubit loss collapses entanglement) vs W robustness. Kept in [legacy/03_ghz_vs_w_comparison.ipynb](experiments/legacy/03_ghz_vs_w_comparison.ipynb); not part of the consolidated submission run.
 
-| n | F (W state) | F (GHZ state) | ΔF (W − GHZ) |
-|---|---|---|---|
-| 3 | 0.94 | 0.96 | −0.02 |
-| 5 | 0.89 | 0.88 | +0.02 |
-| 7 | 0.50 | 0.38 | +0.13 |
-| 10 | 0.35 | 0.24 | +0.11 |
-| 15 | 0.25 | 0.14 | +0.12 |
-| 19 | 0.19 | 0.09 | **+0.10** |
+### 3. Free fidelity lower bound (Tóth-Gühne)
 
-**W states maintain higher fidelity than GHZ states as n grows** — empirical demonstration of GHZ fragility (single-qubit loss collapses entanglement) vs W robustness (loss leaves residual entanglement).
+Same two-circuit data that gives W also gives a **free** lower bound on the state fidelity to the target graph state: $F \geq \langle P_A\rangle + \langle P_B\rangle - 1$ where $\langle P_X\rangle$ is the projection onto the +1 eigenspace of all stabilizers in setting $X$. From the consolidated run:
 
-### 3. Direct Fidelity Estimation (DFE)
+| Device | n | ⟨P_A⟩ | ⟨P_B⟩ | F_lb |
+|--------|---|---|---|---|
+| Garnet  | 6  | 0.872 | 0.903 | **0.776** |
+| Garnet  | 12 | 0.733 | 0.753 | **0.486** |
+| Garnet  | 20 | 0.511 | 0.497 | **0.008** |
+| Emerald | 6  | 0.871 | 0.904 | **0.775** |
+| Emerald | 12 | 0.702 | 0.795 | **0.497** |
+| Emerald | 20 | 0.358 | 0.434 | −0.208 (improves to **+0.11** with empirical-edge tree, §6) |
 
-Flammia & Liu 2011 — sample random stabilizers, average. **Quantitative state fidelity, not just witness violation.** Garnet at every n:
-
-| n | F (DFE) |
-|---|---|
-| 6 | 0.832 ± 0.007 |
-| 8 | 0.712 ± 0.010 |
-| 12 | 0.626 ± 0.012 |
-| 16 | 0.502 ± 0.010 |
-| 20 | 0.334 ± 0.013 |
+DFE (Flammia-Liu 2011) was used in earlier iterations (legacy notebooks 01/02) for an independent quantitative fidelity check; it agrees with the bound above within shot noise. Implementation kept in [src/dfe.py](src/dfe.py).
 
 ### 4. W-state non-linear entanglement witness
 
-Z-basis statistics alone cannot distinguish a W state from a classical mixture of single-excitation strings. The X-basis pairwise correlator $\langle X_i X_j\rangle$ does: quantum gives $2/N$, classical gives $0$. Measured on hardware via the F-gate Diker preparation:
+Z-basis statistics alone cannot distinguish a W state from a classical mixture of single-excitation strings. The X-basis pairwise correlator $\langle X_i X_j\rangle$ does: quantum gives $2/N$, classical gives $0$. The full table per device is in §5; the headline is that on **both** Emerald and Garnet at n ∈ {5, 10, 15, 19} the measured witness is +25σ to +60σ above the classical bound 0.
 
-| n | classical bound | $\overline{\langle X_i X_j\rangle}$ measured | conservative σ | σ above 0 |
-|---|---|---|---|---|
-| 5  | 0 | 0.224 | 0.028 | **+8.0** |
-| 10 | 0 | 0.537 | 0.005 | **+108** |
-| 15 | 0 | 0.629 | 0.003 | **+200+** |
-| 20 | 0 | 0.620 | 0.002 | **+300+** |
-| 25 | 0 | 0.587 | 0.002 | **+390+** |
+### 5. W-state scaling — both devices
 
-Every n is **far above** the classical-mixture bound (σ from sample-std across pairs / √n_pairs, the conservative estimate). The witness rules out the classical single-excitation mixture decisively even when Z-basis fidelity to the ideal W state has dropped to 0.25. (The fact that the measured value at large n exceeds the W-state ideal $2/N$ means the noisy state is not a clean W either — but it remains demonstrably non-classical, which is what this witness actually proves.)
+Same F-gate W preparation across n ∈ {5, 10, 15, 19} on **both** Emerald and Garnet, with beam-search Hamiltonian-path routing. n=19 is the maximum chain length on Garnet (the 20-qubit Apollo lattice has no Hamiltonian path of length 20). Conservative σ = std across pairs / √n_pairs:
 
-### 5. W-state scaling on Emerald
+| Device | n | Z fidelity F_z | ⟨W_x⟩ | quantum ideal 2/n | σ_avg | σ above classical 0 |
+|--------|---|---|---|---|---|---|
+| Garnet  | 5  | 0.913 | 0.384 | 0.400 | 0.0064 | **+59.8** |
+| Garnet  | 10 | 0.800 | 0.170 | 0.200 | 0.0058 | **+29.1** |
+| Garnet  | 15 | 0.630 | 0.114 | 0.133 | 0.0041 | **+27.9** |
+| Garnet  | 19 | 0.449 | 0.082 | 0.105 | 0.0032 | **+25.6** |
+| Emerald | 5  | 0.885 | 0.388 | 0.400 | 0.0088 | **+43.8** |
+| Emerald | 10 | 0.748 | 0.174 | 0.200 | 0.0068 | **+25.7** |
+| Emerald | 15 | 0.587 | 0.114 | 0.133 | 0.0033 | **+35.0** |
+| Emerald | 19 | 0.345 | 0.093 | 0.105 | 0.0030 | **+30.7** |
 
-Same F-gate W preparation across n ∈ {5, 10, 15, 20, 25} with swap-free chain routing. Hardware Z-basis fidelity and X-basis entanglement witness $\langle W \rangle$ measured per n:
+The non-linear witness rules out the classical single-excitation mixture decisively (≥ +25σ) at every n on both chips, even where Z-basis fidelity to ideal-|W⟩ has dropped below 0.5. Z-fidelity tracks chain quality and decays roughly exponentially in n, as expected from the F-gate cascade depth.
 
-| n | Z fidelity | $\langle W\rangle$ | quantum ideal $2/n$ | $\langle W\rangle/$ideal | σ above 0 (vs classical) |
-|---|---|---|---|---|---|
-| 5 | 0.901 | 0.224 | 0.400 | 0.56 | +8.0 |
-| 10 | 0.753 | 0.537 | 0.200 | — | +108 |
-| 15 | 0.604 | 0.629 | 0.133 | — | +200+ |
-| 20 | 0.403 | 0.620 | 0.100 | — | +300+ |
-| 25 | 0.246 | 0.587 | 0.080 | — | +390+ |
+### 6. Empirical-fidelity tree selection (Anna's edge map → Prim's)
 
-n=5 is the only row where the measured witness sits *below* the quantum ideal $2/N$ — still solidly above the classical bound 0 (+8σ), but only ~56% of the quantum max, indicating a noisier preparation at this chain length than the Z-basis fidelity 0.90 alone would suggest. For n≥10 the witness exceeds $2/N$ (as discussed above, noise pushes the X-basis correlator beyond the pure-W maximum); the witness conclusion *"non-classical"* is what stays sound at every n.
+Measure $F_{ij} = (1+\langle X_iZ_j\rangle+\langle Z_iX_j\rangle+\langle Y_iY_j\rangle)/4$ on every native CZ pair (greedy edge-coloring → matchings: 4 matchings cover all 30 Garnet edges and all 81 Emerald edges). Plug $w(i,j)=1-F_{ij}^{\text{measured}}$ into the same multi-start Prim's MST as the calibration tree. Head-to-head on hardware:
 
-### 6. Routing strategies head-to-head
+| Device | n | Method | W_raw | W +QREM | F_lower_bound |
+|--------|---|--------|-------|---------|---------------|
+| Garnet | 12 | calibration | 10.50 | 11.88 | 0.46 |
+| Garnet | 12 | **empirical** | **10.59** | **12.07** | **0.50** |
+| Emerald | 20 | calibration | 15.96 | 18.12 | **−0.20** |
+| Emerald | 20 | **empirical** | **17.32** | **18.69** | **+0.11** |
 
-Same W-state circuit, two routing approaches in one job for direct comparison:
+The empirical tree wins on every metric on both devices. On Emerald n=20 it picks an entirely different qubit set (qubits 0–13/19/23/24/32/33/40, vs the calibration tree's 22-53 region), and the change **flips F_lb from negative to positive** — a real qualitative win, not just a numerical nudge. Saved at [empirical_vs_calibration.png](experiments/consolidated_results/empirical_vs_calibration.png).
+
+### 7. Routing strategies head-to-head
+
+Same n=15 W-state circuit, two routing approaches in one batched Garnet job for direct comparison (from the consolidated run):
 
 | Metric | IQM Qubit Selector | Beam-search chain |
 |---|---|---|
-| Z-basis depth | 85 | **23** |
-| Z-basis SWAPs | 0 | 0 |
-| Z-basis W-fidelity | 0.16 | **0.79** |
-| Entanglement witness $W$ | 0.003 | **0.162** (81% of ideal, +3.6σ) |
+| Z-basis fidelity F_z | 0.313 | **0.679** |
+| ⟨W_x⟩ (X-basis witness) | 0.085 | **0.114** |
+| σ above classical 0 | +14.3 | **+31.2** |
 
 Custom beam-search chain routing for linear-interaction circuits dramatically outperforms general-purpose layout selection on this specific circuit family. **The IQM Qubit Selector is excellent for arbitrary circuits, but trees / chains beat it when the circuit's interaction graph is itself a tree / chain.**
 
@@ -332,15 +337,21 @@ iqm_hackathon/
 │                                     spotlight + Prim's animation
 │
 └── experiments/
-    ├── 00_gme_walkthrough.ipynb         ← step-by-step 2×3 cluster intro
-    ├── 01_emerald_showcase.ipynb        ← MAIN: comprehensive Emerald run
-    │                                       (raw / +QREM / +ZNE / +QREM+ZNE + DFE)
-    ├── 02_garnet_showcase.ipynb         ← MAIN: same on Garnet (cleaner chip)
-    ├── 03_ghz_vs_w_comparison.ipynb     ← VARIETY: GHZ vs W fidelity scaling
-    ├── 04_w_state_entanglement.ipynb    ← VARIETY: W-state non-linear witness
-    ├── 05_w_state_scaling.ipynb         ← VARIETY: W-state quality vs n with swap-free routing
-    ├── 06_routing_comparison.ipynb      ← IMPL: IQM Selector vs custom beam-search chain
-    └── run_w_state.py                   ← W-state runner script
+    ├── witness_my_entanglement.ipynb    ← MAIN: full story end-to-end on both devices
+    │                                       Part 1 (W-states) + Part 2 (graph-state GME +
+    │                                       empirical-F edge map + tree comparison)
+    ├── consolidated_results/            ← JSON + PNG outputs of the consolidated run
+    └── legacy/                          ← per-topic notebooks from the iterative phase
+        ├── 00_gme_walkthrough.ipynb     ←   step-by-step 2×3 cluster intro
+        ├── 01_emerald_showcase.ipynb    ←   per-device Emerald GME run
+        ├── 02_garnet_showcase.ipynb     ←   per-device Garnet GME run
+        ├── 03_ghz_vs_w_comparison.ipynb ←   GHZ vs W fidelity scaling
+        ├── 04_w_state_entanglement.ipynb←   W-state non-linear witness exploration
+        ├── 05_w_state_scaling.ipynb     ←   W-state quality vs n with beam-search routing
+        ├── 06_routing_comparison.ipynb  ←   IQM Selector vs beam-search chain head-to-head
+        ├── 07_empirical_routing.ipynb   ←   first cut at Anna's measured-F tree
+        ├── results/                     ←   saved JSONs from per-topic runs
+        └── figures/                     ←   PNGs from per-topic runs
 ```
 
 ---
@@ -362,8 +373,13 @@ python test_smoke.py
 **With hardware** (IQM Resonance):
 ```bash
 $env:IQM_TOKEN = "your_token_here"
-jupyter lab experiments/02_garnet_showcase.ipynb
+jupyter lab experiments/witness_my_entanglement.ipynb
 ```
+
+The consolidated notebook reads `RERUN_HW` at the top: set `True` to submit
+fresh jobs (one batched job per device per experiment block, ~8 jobs total),
+or `False` to reproduce every figure from the saved JSONs in
+`experiments/consolidated_results/`.
 
 Hardware budget: full Emerald + Garnet sweeps (witnesses + ZNE + DFE) ≈ 50 IQM tokens.
 

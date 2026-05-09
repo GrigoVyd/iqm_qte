@@ -50,4 +50,36 @@ dfe = direct_fidelity_estimation(backend, state, n, edges, n_samples=100, shots_
 print(f"DFE F = {dfe['F_estimate']:.4f} +/- {dfe['F_std_err']:.4f}")
 assert dfe['F_estimate'] > 0.95, "Noiseless simulator should give F~1"
 
+print("\n=== W-state circuit + witness ===")
+from src.circuits import build_w_state, w_state_z_circuit, w_state_x_circuit
+from src.witnesses import z_fidelity, x_witness, witness_significance, parse_counts
+qcw = build_w_state(5)
+print(f"W5: {qcw.num_qubits} qubits, depth {qcw.depth()}, ops {dict(qcw.count_ops())}")
+qcwz = w_state_z_circuit(5); qcwx = w_state_x_circuit(5)
+trz = transpile(qcwz, backend, optimization_level=0)
+trx = transpile(qcwx, backend, optimization_level=0)
+res = backend.run([trz, trx], shots=4000).result()
+cz_counts = parse_counts(res.get_counts(0), 5); cx_counts = parse_counts(res.get_counts(1), 5)
+fz = z_fidelity(cz_counts, 5); sig = witness_significance(cx_counts, 5)
+print(f"W5 Aer: F_z={fz:.3f} (ideal 1.0), <W_x>={sig['mean']:.3f} (ideal {sig['ideal_2_over_n']:.3f})")
+assert fz > 0.95 and sig['mean'] > 0.3, "W5 should give near-ideal F_z and W_x on simulator"
+
+print("\n=== beam-search chain (synthetic) ===")
+from src.routing import beam_search_chain
+adj = {i: {(i-1)%6, (i+1)%6} for i in range(6)}  # 6-cycle
+cz = {frozenset({i, (i+1)%6}): 0.99 for i in range(6)}
+ro = {i: 0.95 for i in range(6)}
+path, score = beam_search_chain(5, adj, cz, ro,
+                                  lambda q,t: 1.0, lambda q,t: 1.0,
+                                  gate_ns=80, beam_width=20)
+print(f"Length-5 path on 6-cycle: {path}  score={score:.3f}")
+assert len(path) == 5
+
+print("\n=== empirical-tree selection (synthetic) ===")
+from src.backend import select_best_tree_empirical
+F = {(i, i+1): 0.95 for i in range(5)}
+F[(2, 3)] = 0.70  # weak link
+out = select_best_tree_empirical(backend, 4, F)
+print(f"Empirical tree: qubits={out['qubits']} edges={out['edges']}")
+
 print("\n=== ALL TESTS PASSED ===")
