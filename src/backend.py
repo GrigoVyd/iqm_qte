@@ -24,9 +24,14 @@ def get_backend(token: str | None = None, device: str = "emerald"):
     Falls back to Aer simulator if no token is provided.
     Token can also be set via IQM_TOKEN environment variable.
     """
-    token = token or os.environ.get("IQM_TOKEN")
-    if token and IQM_AVAILABLE:
-        provider = IQMProvider(RESONANCE_URL, quantum_computer=device, token=token)
+    env_token = os.environ.get("IQM_TOKEN")
+    effective = token or env_token
+    if effective and IQM_AVAILABLE:
+        # iqm-client errors if BOTH env var and arg are set; pass arg only when env is absent.
+        if env_token:
+            provider = IQMProvider(RESONANCE_URL, quantum_computer=device)
+        else:
+            provider = IQMProvider(RESONANCE_URL, quantum_computer=device, token=token)
         return provider.get_backend()
     print("No token provided — using Aer simulator.")
     return AerSimulator()
