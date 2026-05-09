@@ -100,6 +100,57 @@ def gme_significance_graph(W: float, n: int, shots: int) -> float:
     return (W - (n - 1)) / std_W if std_W > 0 else 0.0
 
 
+def fidelity_lower_bound(
+    counts_a: dict[str, int],
+    counts_b: dict[str, int],
+    n: int,
+    edges: list[tuple[int, int]],
+    coloring: list[int],
+) -> dict:
+    """Compute the Tóth-Gühne 2005 fidelity lower bound from the same shots
+    used for the GME witness, no extra hardware time.
+
+    F ≥ ⟨P_A⟩ + ⟨P_B⟩ − 1
+    where P_X = ∏_{i ∈ color X} (I + g_i) / 2.
+
+    ⟨P_X⟩ = fraction of shots where every color-X stabilizer generator
+    simultaneously has eigenvalue +1.
+
+    Returns dict with: P_A, P_B, F_lower_bound, n_shots_a, n_shots_b.
+    """
+    nbrs = neighbours_from_edges(n, edges)
+
+    def proj_value(counts: dict[str, int], color: int) -> float:
+        color_qs = [q for q in range(n) if coloring[q] == color]
+        total = sum(counts.values())
+        hits = 0
+        for bs, cnt in counts.items():
+            bs = bs.replace(' ', '')
+            ok = True
+            for q in color_qs:
+                v = 1
+                for k in [q] + nbrs[q]:
+                    bit = bs[n - 1 - k]
+                    v *= 1 if bit == '0' else -1
+                if v != 1:
+                    ok = False
+                    break
+            if ok:
+                hits += cnt
+        return hits / total if total else 0.0
+
+    P_A = proj_value(counts_a, 0)
+    P_B = proj_value(counts_b, 1)
+    F_lb = P_A + P_B - 1
+    return {
+        "P_A": P_A,
+        "P_B": P_B,
+        "F_lower_bound": F_lb,
+        "n_shots_a": sum(counts_a.values()),
+        "n_shots_b": sum(counts_b.values()),
+    }
+
+
 def run_gme_graph(backend, state_circuit: QuantumCircuit, n: int,
                   edges: list[tuple[int, int]], coloring: list[int],
                   shots: int = 4000, initial_layout: list[int] | None = None) -> dict:
