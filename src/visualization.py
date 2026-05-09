@@ -17,11 +17,45 @@ import numpy as np
 
 # ---------- layout ----------
 
+# Exact IQM Emerald (Aphrodite) layout, transcribed from the ASCII art in
+# iqm.cirq_iqm.devices.aphrodite.Aphrodite docstring. Coordinates are in the
+# diamond-grid convention used on the Resonance dashboard: each unit step in
+# x or y corresponds to one diagonal step on the chip. Qubit i (0-indexed)
+# maps to physical name QB{i+1}.
+EMERALD_POSITIONS: dict[int, tuple[float, float]] = {
+    # row 10 (top)
+    53: (1, 10), 50: (3, 10), 45: (5, 10), 38: (7, 10),
+    # row 9
+    52: (0, 9), 49: (2, 9), 44: (4, 9), 37: (6, 9), 30: (8, 9),
+    # row 8
+    51: (-1, 8), 48: (1, 8), 43: (3, 8), 36: (5, 8), 29: (7, 8),
+    # row 7
+    47: (0, 7), 42: (2, 7), 35: (4, 7), 28: (6, 7), 21: (8, 7),
+    # row 6
+    46: (-1, 6), 41: (1, 6), 34: (3, 6), 27: (5, 6), 20: (7, 6), 13: (9, 6),
+    # row 5
+    40: (0, 5), 33: (2, 5), 26: (4, 5), 19: (6, 5), 12: (8, 5),
+    # row 4
+    39: (-1, 4), 32: (1, 4), 25: (3, 4), 18: (5, 4), 11: (7, 4), 6: (9, 4),
+    # row 3
+    31: (0, 3), 24: (2, 3), 17: (4, 3), 10: (6, 3), 5: (8, 3),
+    # row 2
+    23: (1, 2), 16: (3, 2), 9: (5, 2), 4: (7, 2), 1: (9, 2),
+    # row 1
+    22: (0, 1), 15: (2, 1), 8: (4, 1), 3: (6, 1), 0: (8, 1),
+    # row 0 (bottom)
+    14: (1, 0), 7: (3, 0), 2: (5, 0),
+}
+
+
 def _device_layout(backend) -> dict[int, tuple[float, float]]:
-    """BFS-diamond layout: place qubits on a 45°-rotated grid by walking the
-    bipartite coupling graph and assigning (±1, ±1) offsets to each new
-    neighbour. Produces a clean planar embedding similar to the IQM dashboard.
+    """Hardcoded IQM Emerald layout if the backend has 54 qubits.
+    Falls back to BFS-diamond walk for unknown topologies.
     """
+    if backend.num_qubits == 54:
+        # Use the exact IQM dashboard layout
+        return {i: (float(x), float(y)) for i, (x, y) in EMERALD_POSITIONS.items()}
+    # Fallback: BFS-diamond walk
     coupling: list[tuple[int, int]] = []
     seen: set[tuple[int, int]] = set()
     for a, b in backend.coupling_map:
@@ -91,6 +125,31 @@ def _device_layout(backend) -> dict[int, tuple[float, float]]:
 
 # ---------- color helpers ----------
 
+def _bipartite_coloring(backend) -> dict[int, int]:
+    """2-color the device coupling graph (BFS). Returns {qubit_idx: 0 or 1}."""
+    from collections import deque
+    adj: dict[int, set[int]] = {}
+    for a, b in backend.coupling_map:
+        adj.setdefault(a, set()).add(b)
+        adj.setdefault(b, set()).add(a)
+    color: dict[int, int] = {}
+    for start in range(backend.num_qubits):
+        if start in color:
+            continue
+        if start not in adj:
+            color[start] = 0
+            continue
+        color[start] = 0
+        q = deque([start])
+        while q:
+            u = q.popleft()
+            for v in adj.get(u, []):
+                if v not in color:
+                    color[v] = 1 - color[u]
+                    q.append(v)
+    return color
+
+
 def _color_for_metric(value: float | None, metric: str) -> tuple:
     """Map a metric value to a viridis color. Returns gray if missing."""
     if value is None:
@@ -148,6 +207,10 @@ def plot_device_topology(
 
     bg_alpha = 0.22 if (spotlight and has_highlights) else 0.65
 
+    # Bipartite mode pre-compute
+    bp_color = _bipartite_coloring(backend) if color_by == "bipartite" else {}
+    BP_COLORS = {0: '#3aa56b', 1: '#7b3aa5'}   # green, purple — IQM dashboard palette
+
     # --- Layer 1: dim background edges ---
     for a, b in backend.coupling_map:
         if a >= b:
@@ -173,8 +236,11 @@ def plot_device_topology(
         if i in hi_qubits:
             continue
         x, y = pos[i]
-        col = _color_for_metric(
-            metrics.get(i, {}).get(color_by) if metrics else None, color_by)
+        if color_by == "bipartite":
+            col = BP_COLORS[bp_color.get(i, 0)]
+        else:
+            col = _color_for_metric(
+                metrics.get(i, {}).get(color_by) if metrics else None, color_by)
         circle = patches.Circle((x, y), radius=0.32, facecolor=col,
                                  edgecolor='white', linewidth=1.0,
                                  alpha=bg_alpha, zorder=3)
@@ -200,8 +266,11 @@ def plot_device_topology(
     # --- Layer 4: highlighted nodes ---
     for i in hi_qubits:
         x, y = pos[i]
-        col = _color_for_metric(
-            metrics.get(i, {}).get(color_by) if metrics else None, color_by)
+        if color_by == "bipartite":
+            col = BP_COLORS[bp_color.get(i, 0)]
+        else:
+            col = _color_for_metric(
+                metrics.get(i, {}).get(color_by) if metrics else None, color_by)
         # outer halo
         ax.add_patch(patches.Circle((x, y), radius=0.55,
                                      facecolor='none', edgecolor='#ff3b3b',
