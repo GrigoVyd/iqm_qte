@@ -13,7 +13,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from src.backend import get_backend, is_simulator
+from src.backend import get_backend, is_simulator, select_best_subgrid
 from src.circuits.cluster_2d import build_cluster_2d_no_measure
 from src.witnesses.gme_cluster import build_gme_circuits, compute_gme_witness, gme_significance
 
@@ -23,16 +23,12 @@ DEVICE = "emerald"
 
 
 def select_qubits(backend, rows: int, cols: int) -> list[int] | None:
-    """Try to pick a good rows*cols qubit subset. Return None on failure."""
     if is_simulator(backend):
         return list(range(rows * cols))
     try:
-        from src.backend import get_best_grid, get_calibration_scores
-        scores = get_calibration_scores(backend)
-        layout = get_best_grid(backend, rows, cols, scores=scores)
-        print(f"  Selected qubits: {layout.qubit_names}")
-        print(f"  Avg fidelity score: {sum(layout.scores.values())/len(layout.scores):.4f}")
-        return layout.qubit_indices
+        layout, cost, n = select_best_subgrid(backend, rows, cols, readout_mode='fidelity')
+        print(f"  Selected ({n} candidates): {layout}  cost={cost:.4f}")
+        return layout
     except Exception as e:
         print(f"  Qubit selection failed ({e}); letting Qiskit pick layout.")
         return None

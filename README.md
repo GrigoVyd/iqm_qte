@@ -173,24 +173,15 @@ All stabilizers within 0.89–0.94 — clean, consistent, no broken qubit.
 
 ---
 
-## Supporting layers
+## Supporting variety layer
 
-While the cluster GME witness is our main result, two additional layers contribute to the **variety** score:
-
-### Layer 1 — CHSH + Mermin (2–5 qubits)
+While the cluster GME witness is our main result, **CHSH + Mermin** gives a separate mathematical framework (Bell inequalities) for the variety score:
 
 - **CHSH** on a singlet: |S| > 2 proves 2-qubit entanglement (Tsirelson bound 2√2)
 - **Mermin-n** on GHZ-n: |M_n| > 2^{n/2} classical bound; quantum value 2^{n−1} grows exponentially
 
-These are the rigorous textbook foundations — different mathematical framework (Bell inequalities) than the stabilizer-based GME witness.
-
-Code: [`src/witnesses/chsh.py`](src/witnesses/chsh.py), [`src/witnesses/mermin.py`](src/witnesses/mermin.py)
-
-### Layer 3 — Classical Shadows (information-theoretic)
-
-Random Pauli measurements estimate Rényi-2 entropy S₂ for any subsystem. S₂ > 0 across a bipartition proves entanglement *information-theoretically* without specifying a witness. From Huang, Kueng, Preskill (2020).
-
-Code: [`src/witnesses/classical_shadows.py`](src/witnesses/classical_shadows.py)
+Code: [`src/witnesses/chsh.py`](src/witnesses/chsh.py), [`src/witnesses/mermin.py`](src/witnesses/mermin.py).
+Notebook: [`experiments/03_chsh_mermin.ipynb`](experiments/03_chsh_mermin.ipynb).
 
 ---
 
@@ -202,29 +193,21 @@ iqm_hackathon/
 ├── CLAUDE.md                          ← assistant instructions
 ├── hardware_test_gme.py               ← minimal hardware smoke test
 ├── test_smoke.py                      ← all modules on Aer simulator
-├── ETHQHack2026-main/                 ← official challenge materials
 │
 ├── src/
-│   ├── backend.py                     ← IQM connection, qubit selection
+│   ├── backend.py                     ← IQM connection + sub-grid selector
 │   ├── circuits/
-│   │   ├── ghz.py                     ← GHZ (for Mermin layer)
 │   │   ├── cluster_2d.py              ← 2D cluster state (depth 3)
-│   │   └── utils.py                   ← topology helpers
-│   ├── witnesses/
-│   │   ├── chsh.py                    ← CHSH on singlet
-│   │   ├── mermin.py                  ← Mermin M_n operator
-│   │   ├── gme_cluster.py             ← GME witness (main)
-│   │   └── classical_shadows.py       ← Rényi-2 entropy
-│   └── mitigation/
-│       └── readout.py                 ← QREM
+│   │   └── ghz.py                     ← GHZ (variety layer)
+│   └── witnesses/
+│       ├── gme_cluster.py             ← GME witness (main)
+│       ├── chsh.py                    ← CHSH on singlet (variety)
+│       └── mermin.py                  ← Mermin M_n (variety)
 │
 └── experiments/
-    ├── 00_gme_walkthrough.ipynb       ← step-by-step procedure (start here)
-    ├── 01_chsh_mermin.ipynb           ← supporting variety layer
-    ├── 02_cluster_gme.ipynb           ← extended GME experiments
-    ├── 03_classical_shadows.ipynb     ← shadow tomography
-    ├── 04_scaling.ipynb               ← GME sweep 6→54 qubits
-    └── 05_summary.ipynb               ← final figures
+    ├── 00_gme_walkthrough.ipynb       ← step-by-step 2×3 walkthrough (start here)
+    ├── 02_gme_scaling.ipynb           ← scaling sweep on hardware
+    └── 03_chsh_mermin.ipynb           ← CHSH + Mermin variety layer
 ```
 
 ---
@@ -274,10 +257,6 @@ The smoke test on the simulator gives W = n exactly. The hardware test gives W s
 6. J. F. Clauser, M. A. Horne, A. Shimony, R. A. Holt, *"Proposed experiment to test local hidden-variable theories"*, **Phys. Rev. Lett. 23, 880 (1969)**.
 
 7. N. D. Mermin, *"Extreme quantum entanglement in a superposition of macroscopically distinct states"*, **Phys. Rev. Lett. 65, 1838 (1990)**.
-
-**Classical shadows (Layer 3)**
-
-8. H.-Y. Huang, R. Kueng, J. Preskill, *"Predicting many properties of a quantum system from very few measurements"*, **Nature Physics 16, 1050 (2020)**.
 
 ---
 
