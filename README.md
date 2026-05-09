@@ -2,20 +2,54 @@
 
 **IQM Challenge: Prove quantum entanglement on IQM hardware in the most compelling, scalable, and flexible way possible.**
 
-## Headline result
+## Headline results
 
-**20-qubit Genuine Multipartite Entanglement certified on IQM Emerald** using an optimal spanning-tree graph state with parity-QREM mitigation:
+We deploy **two qualitatively distinct entanglement witnesses on three different families of multipartite states**, all on real IQM hardware, and reach **GME on 20 qubits with the entire Garnet chip**.
 
-| n | bound | W (raw) | W (+QREM) | σ (+QREM) | GME |
-|---|---|---|---|---|---|
-| **8** | 7 | 7.23 | **8.17** | **+16.1** | **✓** |
-| **12** | 11 | 10.65 | **11.97** | **+10.9** | **✓** |
-| **16** | 15 | 13.63 | **15.51** | **+5.0** | **✓** |
-| **20** | 19 | 16.98 | **19.13** | **+1.1** | **✓** |
+### 1. Graph-state GME witness (main result)
 
-**Beats the MIT iQuHACK 2026 winner (Topological Ducks, 16 qubits) by 4 qubits.**
+Optimal spanning-tree graph state + parity-QREM + zero-noise extrapolation. Garnet, full chip:
 
-The same witness math (Tóth & Gühne 2005) — generalized from rectangular cluster states to **arbitrary 2-colorable graph states** chosen by min-weight spanning tree on the live device topology. Theory is identical; the trick is that a tree on n qubits has only n−1 CZ gates instead of ~2n, so prep fidelity stays high enough to certify W > n−1 at much larger sizes.
+| n | bound | W +QREM | σ +QREM | W +QREM+ZNE | σ +QREM+ZNE | GME |
+|---|---|---|---|---|---|---|
+| 6 | 5 | 5.99 | +15.6 | 6.13 | +23.2 | ✓ |
+| 8 | 7 | 8.04 | +14.2 | 8.32 | +20.8 | ✓ |
+| 12 | 11 | 11.70 | +7.8 | 12.25 | +15.1 | ✓ |
+| 16 | 15 | 15.53 | +5.2 | 16.40 | +13.9 | ✓ |
+| **20** | **19** | **19.18** | **+1.6** | **20.38** | **+13.1** | **✓** |
+
+Theory: Tóth & Gühne 2005 PRL+PRA. Witness = $\sum_i \langle g_i\rangle \le n-1$ for any biseparable state. We generalised from rectangular clusters to **arbitrary 2-colorable graph states**, picking minimum-weight spanning trees on the live device topology — a tree on $n$ qubits has only $n-1$ CZ gates (vs $\sim 2n$ for a grid), so prep fidelity stays high.
+
+### 2. GHZ vs W state fidelity comparison (variety)
+
+Same Diker / F-gate W-state preparation, different N. Direct hardware fidelity comparison on Emerald & Garnet:
+
+| n | F (W state) | F (GHZ state) | ΔF (W − GHZ) |
+|---|---|---|---|
+| 3 | 0.94 | 0.96 | −0.02 |
+| 5 | 0.89 | 0.88 | +0.02 |
+| 7 | 0.50 | 0.38 | +0.13 |
+| 10 | 0.35 | 0.24 | +0.11 |
+| 15 | 0.25 | 0.14 | +0.12 |
+| 19 | 0.19 | 0.09 | **+0.10** |
+
+**W states maintain higher fidelity than GHZ states as n grows** — empirical demonstration of GHZ fragility (single-qubit loss collapses entanglement) vs W robustness (loss leaves residual entanglement).
+
+### 3. Direct Fidelity Estimation (DFE)
+
+Flammia & Liu 2011 — sample random stabilizers, average. **Quantitative state fidelity, not just witness violation.** Garnet at every n:
+
+| n | F (DFE) |
+|---|---|
+| 6 | 0.832 ± 0.007 |
+| 8 | 0.712 ± 0.010 |
+| 12 | 0.626 ± 0.012 |
+| 16 | 0.502 ± 0.010 |
+| 20 | 0.334 ± 0.013 |
+
+### 4. W-state non-linear entanglement witness
+
+Z-basis statistics alone cannot distinguish a W state from a classical mixture of single-excitation strings. The X-basis pairwise correlator $\langle X_i X_j\rangle$ does: quantum gives $2/N$, classical gives $0$. Detected on hardware via the F-gate Diker preparation.
 
 ---
 
@@ -23,12 +57,13 @@ The same witness math (Tóth & Gühne 2005) — generalized from rectangular clu
 
 1. [Strategy and why we win](#strategy-and-why-we-win)
 2. [Hardware](#hardware)
-3. [Theory: GME witness for 2-colorable graph states](#theory-gme-witness-for-2-colorable-graph-states)
-4. [Pipeline: from device metrics to certified W](#pipeline-from-device-metrics-to-certified-w)
-5. [Supporting variety layer](#supporting-variety-layer)
-6. [Project structure](#project-structure)
-7. [Running it yourself](#running-it-yourself)
-8. [References](#references)
+3. [Theory I — Graph-state GME witness](#theory-i--graph-state-gme-witness)
+4. [Theory II — W states + non-linear witness](#theory-ii--w-states--non-linear-witness)
+5. [Pipeline: from device metrics to certified W](#pipeline-from-device-metrics-to-certified-w)
+6. [Variety table](#variety-table)
+7. [Project structure](#project-structure)
+8. [Running it yourself](#running-it-yourself)
+9. [References](#references)
 
 ---
 
@@ -49,38 +84,39 @@ Scoring weights chosen: **20% qubits / 20% variety / 30% implementation / 20% th
 - **IBM Eagle 127-qubit GHZ (2023)**: Linear chain, requires O(n) circuit depth.
 - **MIT iQuHACK 2026 winner (Topological Ducks)**: 16 qubits with CHSH + graph states + OR-Tools routing optimization. Won on routing, not witness theory.
 
-### Our four-pronged approach
+### Our approach in five prongs
 
 | Prong | What it does | Effect |
 |---|---|---|
 | **2-colorable graph states** | Use any connected bipartite subgraph instead of rectangular grids | n−1 CZ gates (tree) vs ~2n (grid) — 30% fewer errors |
-| **Threshold filter** | Drop qubits below per-qubit T1/T2/readout/1Q thresholds before layout | Excludes broken qubits that drag W below n−1 |
-| **Live calibration min-spanning-tree** | Prim's algorithm with edge weight = 1 − CZ_fidelity | Routes around bad CZ pairs; truly optimal subgraph |
+| **Threshold filter + multi-start Prim's** | Drop weak qubits, route around bad CZ pairs via min-weight spanning tree on live calibration data | Truly optimal sub-tree per n |
 | **Parity QREM** | Per-qubit readout correction from device-reported error rates | +0.10 lift to ⟨g_i⟩ — no extra calibration circuits |
+| **Zero-noise extrapolation** | CZ folding (with barriers to prevent transpiler cancellation) → linear fit → extrapolate to α=0, with bootstrap σ | Pushes n=20 from σ=+1.6 to σ=+13 on Garnet |
+| **Variety: W vs GHZ vs graph states** | Three qualitatively different state families, two different witnesses (sum-of-stabilizers + non-linear pairwise correlator) | Honest 4 distinct hardware demonstrations |
 
-Each prong is independently sound and stacks with the others. **Combined, they take us from 6 qubits to 20 qubits certified.**
+Each prong is independently sound and stacks with the others.
 
 ---
 
 ## Hardware
 
-[IQM Resonance](https://resonance.meetiqm.com) — IQM Emerald (54 qubits).
+[IQM Resonance](https://resonance.meetiqm.com) — both Emerald (54q) and Garnet (20q).
 
-| Spec | Value |
-|---|---|
-| Native gates | PRX (Phased-X), CZ |
-| 1Q fidelity | 99.93% |
-| 2Q fidelity (CZ) | 92–99% (varies per pair) |
-| T₁ | up to 0.96 ms (varies per qubit) |
-| Topology | Bipartite — 81 native CZ pairs |
-| Max shots/job | 20,000 |
-| Max circuits/batch | 200 |
+| Spec | Emerald | Garnet |
+|---|---|---|
+| Qubits | 54 | 20 |
+| Native gates | PRX (Phased-X), CZ | PRX, CZ |
+| 1Q fidelity | ~99.93% | ~99.93% |
+| 2Q fidelity (CZ) | 92–99% (varies per pair) | 95–99% |
+| T₁ | up to 0.96 ms (varies) | up to 100 µs |
+| Topology | Bipartite — 81 native CZ pairs | Bipartite — 30 native CZ pairs |
+| Qubits passing our default thresholds | 50 / 54 | **20 / 20** |
 
-**Note**: Emerald is *not* a regular 6×9 lattice. It's a bipartite graph with 81 edges, varying connectivity, and several broken/degraded qubits at any given time. Our pipeline reads live calibration and routes around them.
+**Key empirical finding**: Garnet has uniformly cleaner calibration. Every Garnet qubit passes our default thresholds; on Emerald 4 are excluded. Garnet is the better demonstration platform for our witness.
 
 ---
 
-## Theory: GME witness for 2-colorable graph states
+## Theory I — Graph-state GME witness
 
 ### The graph state
 
@@ -88,34 +124,34 @@ For any graph G = (V, E):
 
 $$|G\rangle = \prod_{(i,j) \in E} \mathrm{CZ}_{ij} \cdot H^{\otimes n} |0\rangle^{\otimes n}$$
 
-H on every qubit, then CZ on every edge. Constant-time per layer (single-qubit gates and disjoint CZs run in parallel).
+H on every qubit, then CZ on every edge. Constant-time per layer.
 
 ### The stabilizer
 
-For each qubit i, the graph state is a +1 eigenstate of:
+For each qubit i:
 
 $$g_i = X_i \otimes \bigotimes_{j \in N(i)} Z_j$$
 
-where N(i) is the set of graph neighbors of i. By construction, ⟨g_i⟩ = +1 for all i in the perfect graph state.
+By construction, $\langle g_i \rangle = +1$ for the perfect graph state.
 
 ### The witness (Tóth & Gühne 2005)
 
 $$W = \sum_{i=1}^n \langle g_i \rangle$$
 
-**Theorem**: For any biseparable state, W ≤ n − 1. Therefore:
+**Theorem**: For any biseparable state, $W \leq n - 1$. Therefore:
 
-$$W > n - 1 \;\;\Longrightarrow\;\; \text{Genuine Multipartite Entanglement}$$
+$$W > n - 1 \implies \text{Genuine Multipartite Entanglement}$$
 
-This bound holds for **any connected 2-colorable graph state** — there's no requirement that G be a rectangular grid.
+This bound holds for **any connected 2-colorable graph state**.
 
 ### Why a spanning tree wins
 
 For a connected graph on n nodes:
 - Any spanning tree has exactly n − 1 edges (= n − 1 CZ gates) — minimum possible
 - A 2D rectangular grid has ~2n edges
-- Trees are always 2-colorable (bipartite)
+- Trees are always 2-colorable
 
-So a tree gives **fewer CZ gates** for the same n, hence better prep fidelity, hence higher ⟨g_i⟩, hence W can clear n−1 at larger sizes. The witness math is unchanged.
+So a tree gives **fewer CZ gates**, hence higher prep fidelity, hence higher $\langle g_i\rangle$, hence W can clear n−1 at larger sizes. We empirically verified this in `01_emerald_showcase.ipynb` — a complete bipartite graph on 8 qubits fails to certify GME under noise that easily certifies a tree.
 
 ### Why only 2 measurement settings
 
@@ -124,6 +160,35 @@ Same trick as for cluster states: BFS-2-color the chosen graph (always possible 
 - **Setting B**: swap → reads ⟨g_i⟩ for every 1-colored qubit
 
 Two circuits, regardless of n.
+
+---
+
+## Theory II — W states + non-linear witness
+
+### W state preparation (Diker / F-gate method)
+
+$$|W_N\rangle = \frac{1}{\sqrt{N}}\sum_{k=0}^{N-1}|0\cdots 1_k \cdots 0\rangle$$
+
+A single excitation distributed coherently across all $N$ qubits. The F-gate cascade prepares it in $O(N)$ two-qubit gates:
+
+```
+|10...0⟩ → F-gate chain → CNOT correction → |W_N⟩
+```
+
+Where each F-gate $F_k = R_y(-\theta_k) \cdot CZ \cdot R_y(\theta_k)$ with $\theta_k = \arccos\sqrt{1/(N-k+1)}$.
+
+### Non-linear entanglement witness
+
+The Z-basis statistics — single qubit excited with probability $1/N$, joint excitation forbidden — are **also reproduced by a classical mixture** $\rho_{\text{classical}} = \frac{1}{N}\sum_k |0\cdots 1_k \cdots 0\rangle\langle\cdots|$.
+
+The X-basis breaks the tie:
+
+| State | $\langle X_i X_j\rangle$ for $i \neq j$ |
+|---|---|
+| Quantum $\|W_N\rangle$ | $2/N$ |
+| Classical mixture | $0$ |
+
+A measured $\langle X_i X_j\rangle > 0$ at confidence above shot noise witnesses **genuine quantum coherence** — a different framework than the stabilizer-sum witness.
 
 ---
 
@@ -143,45 +208,61 @@ Two circuits, regardless of n.
 └─────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
-│ 3. Min-weight spanning tree (Prim's algorithm)          │
-│    Edge weight = 1 − CZ_fidelity                        │
-│    Try each survivor as seed, keep lightest tree size n │
+│ 3. Min-weight spanning tree (Prim's) + local search     │
+│    Edge weight = (1 − F_CZ) + T1/T2/1Q penalties         │
+│    Try every survivor as seed, keep lightest tree       │
 └─────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
-│ 4. 2-color the tree (BFS), build measurement circuits   │
+│ 4. Predict ⟨g_i⟩ for each i a-priori                    │
+│    (CZ × T1/T2 × 1Q channel multiplication)             │
+│    If predicted W > n-1: feasible. Else: warn user.     │
 └─────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
-│ 5. Submit 2 circuits to IQM, get bitstrings             │
+│ 5. Build folded circuits at scales α = 1, 3, 5          │
+│    Replace each CZ with α copies separated by barriers  │
+│    Same logical effect (CZ² = I), α× the gate noise     │
 └─────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
-│ 6. Compute raw stabilizers ⟨g_i⟩ → W                    │
+│ 6. Submit ALL circuits in one batched job               │
+│    Drift-fair comparison across n × scales              │
 └─────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
-│ 7. Apply parity-QREM:                                   │
+│ 7. Apply parity-QREM per stabilizer                     │
 │    c_i = 1/(P(0|0)_i + P(1|1)_i − 1)                    │
-│    ⟨g_i⟩_corrected = ⟨g_i⟩_raw · ∏_{j∈{i}∪N(i)} c_j      │
+│    Multiply ⟨g_i⟩ by ∏ c_j over involved qubits          │
 └─────────────────────────────────────────────────────────┘
                           ↓
-                    W > n − 1 ?
+┌─────────────────────────────────────────────────────────┐
+│ 8. ZNE extrapolation with shot-level bootstrap σ        │
+│    Fit W(α=1,3,5) linearly, extrapolate to α=0          │
+│    Resample 200 times for proper variance propagation    │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│ 9. Verdict: W > n−1 ⟹ GME at significance σ              │
+│    Plus DFE for direct fidelity estimate                 │
+└─────────────────────────────────────────────────────────┘
 ```
 
-The whole pipeline runs end-to-end in [`experiments/04_gme_graph.ipynb`](experiments/04_gme_graph.ipynb).
+The entire pipeline runs end-to-end in [`experiments/01_emerald_showcase.ipynb`](experiments/01_emerald_showcase.ipynb) and [`experiments/02_garnet_showcase.ipynb`](experiments/02_garnet_showcase.ipynb).
 
 ---
 
-## Supporting variety layer
+## Variety table
 
-While graph-state GME is our main result, **CHSH + Mermin** gives a separate mathematical framework (Bell inequalities) for the variety score:
+We deploy **3 distinct multipartite state families** with **2 distinct entanglement witnesses** on real hardware:
 
-- **CHSH** on a singlet: |S| > 2 proves 2-qubit entanglement (Tsirelson bound 2√2)
-- **Mermin-n** on GHZ-n: |M_n| > 2^{n/2} classical bound; quantum value 2^{n−1} grows exponentially
+| State | Preparation | Witness type | n range | Notebook |
+|---|---|---|---|---|
+| Graph state (spanning tree) | H + CZ on tree edges | Stabilizer sum (Tóth-Gühne) | 6 – 20 | `01`, `02` |
+| GHZ state | H + CNOT ladder | Probability fidelity | 3 – 20 | `03` |
+| W state | F-gate (Diker) cascade | Probability fidelity + non-linear $\langle X_i X_j\rangle$ | 3 – 30 | `03`, `04` |
 
-Code: [`src/witnesses/chsh.py`](src/witnesses/chsh.py), [`src/witnesses/mermin.py`](src/witnesses/mermin.py).
-Notebook: [`experiments/03_chsh_mermin.ipynb`](experiments/03_chsh_mermin.ipynb).
+Plus Direct Fidelity Estimation (Flammia-Liu 2011) for state quality, complementing all three.
 
 ---
 
@@ -189,32 +270,35 @@ Notebook: [`experiments/03_chsh_mermin.ipynb`](experiments/03_chsh_mermin.ipynb)
 
 ```
 iqm_hackathon/
-├── README.md
-├── CLAUDE.md
-├── hardware_test_gme.py               ← minimal hardware smoke test
-├── test_smoke.py                      ← Aer simulator smoke test
+├── README.md                       ← this file
+├── CLAUDE.md                       ← assistant instructions
+├── test_smoke.py                   ← Aer smoke test
 │
 ├── src/
-│   ├── backend.py                     ← IQM connection, metrics, threshold
-│   │                                    filter, sub-grid + spanning-tree
-│   │                                    finders
+│   ├── backend.py                  ← IQM connection, threshold filter,
+│   │                                  cost function, predictor, sub-tree finder
 │   ├── circuits/
-│   │   ├── cluster_2d.py              ← rectangular 2D cluster (depth 3)
-│   │   ├── graph_state.py             ← arbitrary graph state + 2-coloring
-│   │   └── ghz.py                     ← GHZ for variety layer
+│   │   ├── cluster_2d.py           ← rectangular 2D cluster state
+│   │   └── graph_state.py          ← arbitrary graph state + 2-coloring
 │   ├── witnesses/
-│   │   ├── gme_cluster.py             ← rectangular cluster GME witness
-│   │   ├── gme_graph.py               ← MAIN: arbitrary bipartite GME witness
-│   │   ├── chsh.py                    ← variety
-│   │   └── mermin.py                  ← variety
-│   └── mitigation/
-│       └── parity_qrem.py             ← readout error correction factors
+│   │   ├── gme_cluster.py          ← rectangular cluster GME witness
+│   │   └── gme_graph.py            ← MAIN: arbitrary graph GME witness +
+│   │                                  Tóth-Gühne fidelity lower bound
+│   ├── mitigation/
+│   │   ├── parity_qrem.py          ← readout correction
+│   │   └── zne.py                  ← CZ folding + bootstrap extrapolation
+│   ├── dfe.py                      ← Direct Fidelity Estimation
+│   └── visualization.py            ← exact IQM dashboard layouts (Emerald + Garnet),
+│                                     spotlight + Prim's animation
 │
 └── experiments/
-    ├── 00_gme_walkthrough.ipynb       ← step-by-step 2×3 demo
-    ├── 02_gme_scaling.ipynb           ← rectangular sweep + threshold + QREM
-    ├── 03_chsh_mermin.ipynb           ← variety layer
-    └── 04_gme_graph.ipynb             ← MAIN: 20-qubit graph-state result
+    ├── 00_gme_walkthrough.ipynb         ← step-by-step 2×3 cluster intro
+    ├── 01_emerald_showcase.ipynb        ← MAIN: comprehensive Emerald run
+    │                                       (raw / +QREM / +ZNE / +QREM+ZNE + DFE)
+    ├── 02_garnet_showcase.ipynb         ← MAIN: same on Garnet (cleaner chip)
+    ├── 03_ghz_vs_w_comparison.ipynb     ← VARIETY: GHZ vs W fidelity scaling
+    ├── 04_w_state_entanglement.ipynb    ← VARIETY: W-state non-linear witness
+    └── run_w_state.py                   ← W-state runner script
 ```
 
 ---
@@ -224,7 +308,8 @@ iqm_hackathon/
 ```bash
 python -m venv .venv
 .venv\Scripts\activate              # Windows
-pip install "iqm-client[qiskit]" iqm-qubit-selector numpy matplotlib scipy jupyter rustworkx
+pip install "iqm-client[qiskit]" iqm-qubit-selector \
+            numpy matplotlib scipy jupyter rustworkx networkx
 ```
 
 **Without hardware** (Aer simulator):
@@ -235,61 +320,35 @@ python test_smoke.py
 **With hardware** (IQM Resonance):
 ```bash
 $env:IQM_TOKEN = "your_token_here"
-jupyter lab experiments/04_gme_graph.ipynb
+jupyter lab experiments/02_garnet_showcase.ipynb
 ```
 
-Hardware budget: each grid size ≈ 1 IQM token. Full 4-size sweep (n=8, 12, 16, 20) ≈ 4 tokens, ~20 seconds wall clock.
-
----
-
-## Results summary
-
-### Graph-state spanning tree (main result)
-
-20 qubits genuinely multipartitely entangled, certified at +1.1σ. The 16-qubit tree is certified at +5σ (decisive) with W = 15.51 / 16 = 97% of ideal.
-
-### Rectangular 2D cluster (earlier baseline)
-
-For comparison, the rectangular approach maxed out at:
-
-| Grid | n | W (+QREM) | σ | GME |
-|---|---|---|---|---|
-| 2×3 | 6 | 5.81 | +12.7 | ✓ |
-| 2×4 | 8 | 7.71 | +9.8 | ✓ |
-| 2×5+ | 10+ | — | <0 | ✗ |
-
-The graph-state approach is **2.5× larger** at the same hardware fidelity.
+Hardware budget: full Emerald + Garnet sweeps (witnesses + ZNE + DFE) ≈ 50 IQM tokens.
 
 ---
 
 ## References
 
-**The witness (main)**
+**Graph-state GME witness**
 
-1. G. Tóth, O. Gühne, *"Detecting Genuine Multipartite Entanglement with Two Local Measurements"*, **Phys. Rev. Lett. 94, 060501 (2005)**. [arXiv:quant-ph/0405165](https://arxiv.org/abs/quant-ph/0405165) — foundational 2-setting witness for graph/cluster states.
+1. G. Tóth, O. Gühne, *"Detecting Genuine Multipartite Entanglement with Two Local Measurements"*, **Phys. Rev. Lett. 94, 060501 (2005)**. [arXiv:quant-ph/0405165](https://arxiv.org/abs/quant-ph/0405165)
+2. G. Tóth, O. Gühne, *"Entanglement detection in the stabilizer formalism"*, **Phys. Rev. A 72, 022340 (2005)**. [arXiv:quant-ph/0501020](https://arxiv.org/abs/quant-ph/0501020)
+3. Y. Zhou et al., *"Detecting multipartite entanglement structure with minimal resources"*, **npj Quantum Information 5, 83 (2019)**. [arXiv:1904.05001](https://arxiv.org/abs/1904.05001)
 
-2. G. Tóth, O. Gühne, *"Entanglement detection in the stabilizer formalism"*, **Phys. Rev. A 72, 022340 (2005)**. [arXiv:quant-ph/0501020](https://arxiv.org/abs/quant-ph/0501020) — the W = Σ⟨g_i⟩ ≤ n−1 biseparable bound for graph states.
+**W-state preparation**
 
-3. Y. Zhou, Q. Zhao, X. Yuan, X. Ma, *"Detecting multipartite entanglement structure with minimal resources"*, **npj Quantum Information 5, 83 (2019)**. [arXiv:1904.05001](https://arxiv.org/abs/1904.05001) — explicit 2-setting result via 2-colorability.
+4. F. Diker, *"Deterministic construction of arbitrary W states with quadratically increasing number of two-qubit gates"*, **arXiv:1606.09290 (2016)**.
 
-4. N. K. H. Li, X. Dai, M. H. Muñoz-Arias, K. Reuer, M. Huber, N. Friis, *"Detecting genuine multipartite entanglement in multi-qubit devices with restricted measurements"*, **arXiv:2504.21076 (2025)** — recent extension to k-inseparability and SDP-optimized witnesses.
+**Mitigation**
+
+5. K. Temme, S. Bravyi, J. M. Gambetta, *"Error mitigation for short-depth quantum circuits"*, **PRL 119, 180509 (2017)** — ZNE.
+6. S. Bravyi et al., *"Mitigating measurement errors in multiqubit experiments"*, **Phys. Rev. A 103, 042605 (2021)** — QREM.
+7. S. Flammia, Y.-K. Liu, *"Direct Fidelity Estimation from Few Pauli Measurements"*, **PRL 106, 230501 (2011)** — DFE.
 
 **Graph states**
 
-5. H. J. Briegel, R. Raussendorf, *"Persistent entanglement in arrays of interacting particles"*, **Phys. Rev. Lett. 86, 910 (2001)**.
-
-6. M. Hein, J. Eisert, H. J. Briegel, *"Multiparty entanglement in graph states"*, **Phys. Rev. A 69, 062311 (2004)** — comprehensive review of graph state properties.
-
-**Readout error mitigation**
-
-7. S. Bravyi, S. Sheldon, A. Kandala, D. C. McKay, J. M. Gambetta, *"Mitigating measurement errors in multiqubit experiments"*, **Phys. Rev. A 103, 042605 (2021)**.
-
-**Bell inequalities (variety layer)**
-
-8. J. F. Clauser, M. A. Horne, A. Shimony, R. A. Holt, **Phys. Rev. Lett. 23, 880 (1969)** — CHSH.
-
-9. N. D. Mermin, **Phys. Rev. Lett. 65, 1838 (1990)** — Mermin inequality for GHZ.
+8. H. J. Briegel, R. Raussendorf, *"Persistent entanglement in arrays of interacting particles"*, **PRL 86, 910 (2001)**.
 
 ---
 
-*ETH Quantum Hackathon 2026 — Team submission, branch `david`. 20-qubit GME certified.*
+*ETH Quantum Hackathon 2026 — Team submission, branch `submission`. 20-qubit GME on Garnet certified.*
