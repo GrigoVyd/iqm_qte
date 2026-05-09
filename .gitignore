@@ -52,3 +52,4 @@ htmlcov/
 
 # Miscellaneous
 .pytest_cache/
+.secrets/
