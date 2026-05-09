@@ -169,6 +169,170 @@ def _enumerate_subgrids(backend, rows: int, cols: int,
     return grids
 
 
+CZ_GATE_TIME_S = 100e-9   # IQM Emerald CZ gate duration ~100 ns
+
+
+def _compute_edge_weights(
+    qubit_metrics: dict[int, dict],
+    cz_fidelities: dict[tuple[int, int], float],
+    readout_weight: float = 0.0,
+    t1_weight: float = 0.5,
+    t2_weight: float = 1.0,
+    one_q_weight: float = 1.0,
+    gate_time_s: float = CZ_GATE_TIME_S,
+) -> dict[tuple[int, int], float]:
+    """Comprehensive edge cost capturing all dominant noise channels.
+
+      w(u,v) = (1 - F_CZ(u,v))                     CZ gate error (dominant)
+             + readout_weight · (RO_penalty(u) + RO_penalty(v))   (default 0;
+                                  QREM mitigates readout already)
+             + t1_weight · gate_time · (1/T1(u) + 1/T1(v))        amplitude damping
+             + t2_weight · gate_time · (1/T2(u) + 1/T2(v))        dephasing
+             + one_q_weight · ((1 - F_1Q(u)) + (1 - F_1Q(v)))     1Q gate error
+
+    All terms are per-edge and double-count both endpoints, which approximates
+    the per-edge contribution of each qubit's noise to that gate's outcome.
+    Missing metrics are treated as 0 penalty (best case).
+    """
+    out: dict[tuple[int, int], float] = {}
+    for (a, b), fid in cz_fidelities.items():
+        m_a = qubit_metrics.get(a, {})
+        m_b = qubit_metrics.get(b, {})
+        w = 1.0 - fid
+
+        if readout_weight:
+            ro_a = m_a.get("readout_fidelity", 1.0)
+            ro_b = m_b.get("readout_fidelity", 1.0)
+            w += readout_weight * ((1.0 - ro_a) + (1.0 - ro_b))
+
+        # T1: amplitude damping per gate
+        if t1_weight:
+            t1_a = m_a.get("t1") or 1e9   # huge default = no penalty
+            t1_b = m_b.get("t1") or 1e9
+            w += t1_weight * gate_time_s * (1.0 / t1_a + 1.0 / t1_b)
+
+        # T2: dephasing per gate
+        if t2_weight:
+            t2_a = m_a.get("t2") or 1e9
+            t2_b = m_b.get("t2") or 1e9
+            w += t2_weight * gate_time_s * (1.0 / t2_a + 1.0 / t2_b)
+
+        # 1Q gate error
+        if one_q_weight:
+            f1_a = m_a.get("one_q_fidelity", 1.0)
+            f1_b = m_b.get("one_q_fidelity", 1.0)
+            w += one_q_weight * ((1.0 - f1_a) + (1.0 - f1_b))
+
+        out[(min(a, b), max(a, b))] = w
+    return out
+
+
+def predict_stabilizer_fidelities(
+    qubits: list[int],
+    logical_edges: list[tuple[int, int]],
+    qubit_metrics: dict[int, dict],
+    cz_fidelities: dict[tuple[int, int], float],
+    gate_time_s: float = CZ_GATE_TIME_S,
+) -> dict[int, float]:
+    """Predict ⟨g_i⟩ for each logical qubit i, ignoring readout (assume QREM).
+
+    Heuristic: each stabilizer g_i = X_i ⊗ ⊗_(j∈N(i)) Z_j. The relevant noise
+    sources are CZ errors on edges in the i-neighborhood, plus per-qubit
+    decoherence and 1Q gate error on the involved qubits. We multiply the
+    relevant per-channel fidelities to estimate the residual ⟨g_i⟩.
+    """
+    from src.circuits.graph_state import neighbours_from_edges
+
+    n = len(qubits)
+    nbrs = neighbours_from_edges(n, logical_edges)
+    out: dict[int, float] = {}
+    for i in range(n):
+        involved_logical = [i] + nbrs[i]
+        involved_phys = [qubits[lq] for lq in involved_logical]
+        f = 1.0
+        # CZ fidelities on edges incident to any qubit in involved set
+        for (a, b) in logical_edges:
+            if a in involved_logical or b in involved_logical:
+                pa, pb = qubits[a], qubits[b]
+                cz = cz_fidelities.get((min(pa, pb), max(pa, pb)), 0.99)
+                f *= cz
+        # 1Q gate error per involved qubit (1 H gate per qubit during prep)
+        for pq in involved_phys:
+            f *= qubit_metrics.get(pq, {}).get("one_q_fidelity", 1.0)
+        # Decoherence: total time for prep ≈ depth × gate_time. Conservative:
+        # 1 gate worth of decoherence per involved qubit (could be deeper for
+        # long trees but this is the order-of-magnitude estimate).
+        for pq in involved_phys:
+            t1 = qubit_metrics.get(pq, {}).get("t1") or 1e9
+            t2 = qubit_metrics.get(pq, {}).get("t2") or 1e9
+            f *= max(0.0, 1.0 - 0.5 * gate_time_s / t1 - gate_time_s / t2)
+        out[i] = f
+    return out
+
+
+def _local_search_swap(
+    qubits_in_tree: set[int],
+    tree_edges: list[tuple[int, int]],
+    edge_weight: dict[tuple[int, int], float],
+    nbrs: dict[int, set[int]],
+    max_iterations: int = 50,
+) -> tuple[set[int], list[tuple[int, int]], float]:
+    """Local search: try replacing each tree edge with a non-tree edge that keeps
+    the tree connected and reduces total weight. Repeat until no improvement.
+    """
+    in_tree = set(qubits_in_tree)
+    edges = [tuple(sorted(e)) for e in tree_edges]
+    total_w = sum(edge_weight.get(e, 1.0) for e in edges)
+
+    for _ in range(max_iterations):
+        improved = False
+        for i, e_remove in enumerate(list(edges)):
+            # Removing e_remove splits the tree into two components.
+            # Find them via BFS in tree_edges \ {e_remove}.
+            adj_t: dict[int, list[int]] = {q: [] for q in in_tree}
+            for ee in edges:
+                if ee == e_remove:
+                    continue
+                adj_t[ee[0]].append(ee[1])
+                adj_t[ee[1]].append(ee[0])
+            # BFS from one endpoint of removed edge
+            visited = {e_remove[0]}
+            stack = [e_remove[0]]
+            while stack:
+                u = stack.pop()
+                for v in adj_t[u]:
+                    if v not in visited:
+                        visited.add(v)
+                        stack.append(v)
+            comp_a, comp_b = visited, in_tree - visited
+
+            # Look for a replacement edge crossing the cut, with smaller weight
+            best_replacement = None
+            best_w = edge_weight.get(e_remove, 1.0)
+            for u in comp_a:
+                for v in nbrs.get(u, set()):
+                    if v not in comp_b:
+                        continue
+                    e_new = (min(u, v), max(u, v))
+                    if e_new == e_remove:
+                        continue
+                    w_new = edge_weight.get(e_new, 1.0)
+                    if w_new < best_w:
+                        best_w = w_new
+                        best_replacement = e_new
+
+            if best_replacement is not None:
+                w_old = edge_weight.get(e_remove, 1.0)
+                edges[i] = best_replacement
+                total_w += (best_w - w_old)
+                improved = True
+                break  # restart loop after any improvement
+
+        if not improved:
+            break
+    return in_tree, edges, total_w
+
+
 def select_best_tree(
     backend,
     target_n: int,
@@ -178,7 +342,28 @@ def select_best_tree(
     min_t1: float = 10e-6,
     min_t2: float = 5e-6,
     min_cz_fidelity: float = 0.90,
+    readout_weight: float = 0.0,
+    t1_weight: float = 0.5,
+    t2_weight: float = 1.0,
+    one_q_weight: float = 1.0,
+    use_local_search: bool = True,
 ) -> dict:
+    """Find the best target_n-qubit connected subgraph of the device.
+
+    Cost minimised:
+      sum over tree edges of:
+         (1 - F_CZ)                   CZ gate infidelity (dominant)
+       + t1_weight * t_g * (1/T1_u + 1/T1_v)    amplitude damping
+       + t2_weight * t_g * (1/T2_u + 1/T2_v)    dephasing
+       + one_q_weight * ((1-F_1Q_u) + (1-F_1Q_v))   1Q gate error
+       (readout_weight * RO penalty — off by default since QREM corrects RO)
+
+    Quality threshold filter (default ON) excludes qubits with marginal
+    calibration that empirically drift more than reported metrics suggest.
+
+    Returns dict with: qubits, edges, logical_edges, weight, coloring,
+    predicted_W, predicted_stab_fidelities, n_starts_tried.
+    """
     """Find the best target_n-qubit connected subgraph of the device.
 
     Strategy: filter qubits by per-qubit thresholds, restrict device coupling
@@ -214,22 +399,38 @@ def select_best_tree(
             qm, cz, min_readout_fidelity, min_one_q_fidelity, min_t1, min_t2,
             min_cz_fidelity)
     else:
+        # Only exclude qubits with completely zero CZ fidelity (truly broken).
         good = set(range(backend.num_qubits))
+        bad = {a for (a, b), f in cz.items() if f <= 0.0} | \
+              {b for (a, b), f in cz.items() if f <= 0.0}
+        good = good - bad
 
     if len(good) < target_n:
-        raise ValueError(f"Only {len(good)} qubits pass thresholds — need {target_n}.")
+        raise ValueError(f"Only {len(good)} qubits available — need {target_n}.")
 
-    # Restricted weighted graph: keep edges with both endpoints in `good` AND
-    # CZ fidelity above min_cz_fidelity.
+    # Comprehensive edge cost: CZ + decoherence (T1, T2) + 1Q gate error.
+    # Readout deliberately excluded (QREM mitigates it post-hoc).
+    edge_weight = _compute_edge_weights(
+        qm, cz,
+        readout_weight=readout_weight,
+        t1_weight=t1_weight,
+        t2_weight=t2_weight,
+        one_q_weight=one_q_weight,
+    )
+
+    # Restricted weighted graph
+    nbrs_unweighted: dict[int, set[int]] = {q: set() for q in good}
     nbrs: dict[int, list[tuple[int, float]]] = {q: [] for q in good}
     for (a, b), fid in cz.items():
         if a not in good or b not in good:
             continue
         if fid < min_cz_fidelity:
             continue
-        w = 1.0 - fid  # smaller = better
+        w = edge_weight.get((min(a, b), max(a, b)), 1.0 - fid)
         nbrs[a].append((b, w))
         nbrs[b].append((a, w))
+        nbrs_unweighted[a].add(b)
+        nbrs_unweighted[b].add(a)
 
     # Prim's algorithm from each seed; track lightest tree of exactly target_n nodes.
     import heapq
@@ -265,6 +466,22 @@ def select_best_tree(
     if best is None:
         raise ValueError(f"No connected {target_n}-qubit subtree on filtered graph.")
 
+    # Local search refinement: try edge swaps that reduce total weight while
+    # keeping the tree connected and the same set of nodes.
+    if use_local_search:
+        in_tree_refined, edges_refined, weight_refined = _local_search_swap(
+            set(best["qubits"]),
+            [(a, b) for a, b in best["phys_edges"]],
+            edge_weight,
+            nbrs_unweighted,
+        )
+        if weight_refined < best["weight"]:
+            best = {
+                "qubits": sorted(in_tree_refined),
+                "phys_edges": edges_refined,
+                "weight": weight_refined,
+            }
+
     # Build a stable mapping physical→logical (row-major over `qubits` order).
     qubits = best["qubits"]
     phys_to_log = {p: i for i, p in enumerate(qubits)}
@@ -275,6 +492,10 @@ def select_best_tree(
     if coloring is None:
         raise RuntimeError("Spanning tree should always be 2-colorable.")
 
+    # Predict per-stabilizer fidelity and W for the chosen tree
+    pred = predict_stabilizer_fidelities(qubits, logical_edges, qm, cz)
+    predicted_W = sum(pred.values())
+
     return {
         "qubits": qubits,
         "edges": best["phys_edges"],
@@ -282,6 +503,8 @@ def select_best_tree(
         "weight": best["weight"],
         "coloring": coloring,
         "n_starts_tried": len(good),
+        "predicted_stab_fidelities": pred,
+        "predicted_W": predicted_W,
     }
 
 
