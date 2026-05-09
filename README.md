@@ -51,6 +51,31 @@ Flammia & Liu 2011 — sample random stabilizers, average. **Quantitative state 
 
 Z-basis statistics alone cannot distinguish a W state from a classical mixture of single-excitation strings. The X-basis pairwise correlator $\langle X_i X_j\rangle$ does: quantum gives $2/N$, classical gives $0$. Detected on hardware via the F-gate Diker preparation.
 
+### 5. W-state scaling on Emerald
+
+Same F-gate W preparation across n ∈ {5, 10, 15, 20, 25} with swap-free chain routing. Hardware Z-basis fidelity and X-basis entanglement witness $\langle W \rangle$ measured per n:
+
+| n | Z fidelity | $\langle W \rangle$ | Borderline 2/n | $\langle W\rangle$ above shot noise? |
+|---|---|---|---|---|
+| 5 | 0.901 | 0.224 | 0.400 | yes |
+| 10 | 0.753 | 0.537 | 0.200 | yes |
+| 15 | 0.604 | 0.629 | 0.133 | yes |
+| 20 | 0.403 | 0.620 | 0.100 | yes |
+| 25 | 0.246 | 0.587 | 0.080 | yes |
+
+### 6. Routing strategies head-to-head
+
+Same W-state circuit, two routing approaches in one job for direct comparison:
+
+| Metric | IQM Qubit Selector | Beam-search chain |
+|---|---|---|
+| Z-basis depth | 85 | **23** |
+| Z-basis SWAPs | 0 | 0 |
+| Z-basis W-fidelity | 0.16 | **0.79** |
+| Entanglement witness $W$ | 0.003 | **0.162** (81% of ideal, +3.6σ) |
+
+Custom beam-search chain routing for linear-interaction circuits dramatically outperforms general-purpose layout selection on this specific circuit family. **The IQM Qubit Selector is excellent for arbitrary circuits, but trees / chains beat it when the circuit's interaction graph is itself a tree / chain.**
+
 ---
 
 ## Table of Contents
@@ -259,10 +284,12 @@ We deploy **3 distinct multipartite state families** with **2 distinct entanglem
 | State | Preparation | Witness type | n range | Notebook |
 |---|---|---|---|---|
 | Graph state (spanning tree) | H + CZ on tree edges | Stabilizer sum (Tóth-Gühne) | 6 – 20 | `01`, `02` |
-| GHZ state | H + CNOT ladder | Probability fidelity | 3 – 20 | `03` |
-| W state | F-gate (Diker) cascade | Probability fidelity + non-linear $\langle X_i X_j\rangle$ | 3 – 30 | `03`, `04` |
+| GHZ state | H + CNOT ladder | Probability fidelity | 3 – 19 | `03` |
+| W state | F-gate (Diker) cascade | Probability fidelity + non-linear $\langle X_i X_j\rangle$ | 3 – 30 | `03`, `04`, `05` |
 
 Plus Direct Fidelity Estimation (Flammia-Liu 2011) for state quality, complementing all three.
+
+**Implementation sophistication** is also showcased explicitly: notebook `06` runs the same W-state circuit through both the IQM Qubit Selector (CostEvaluator) and a custom beam-search chain router that exploits linear-interaction structure for swap-free routing. Direct head-to-head hardware comparison.
 
 ---
 
@@ -298,6 +325,8 @@ iqm_hackathon/
     ├── 02_garnet_showcase.ipynb         ← MAIN: same on Garnet (cleaner chip)
     ├── 03_ghz_vs_w_comparison.ipynb     ← VARIETY: GHZ vs W fidelity scaling
     ├── 04_w_state_entanglement.ipynb    ← VARIETY: W-state non-linear witness
+    ├── 05_w_state_scaling.ipynb         ← VARIETY: W-state quality vs n with swap-free routing
+    ├── 06_routing_comparison.ipynb      ← IMPL: IQM Selector vs custom beam-search chain
     └── run_w_state.py                   ← W-state runner script
 ```
 
