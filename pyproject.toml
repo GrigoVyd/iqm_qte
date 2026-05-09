@@ -1,0 +1,14 @@
+[project]
+name = "iqm-qte-david"
+version = "0.1.0"
+description = "Witness My Entanglement — IQM Resonance hackathon code"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "iqm-client[qiskit]>=34.0",
+    "qiskit>=2.0,<3.0",
+    "qiskit-aer>=0.17",
+    "rustworkx>=0.17",
+    "numpy>=2.0",
+    "matplotlib>=3.10",
+]
