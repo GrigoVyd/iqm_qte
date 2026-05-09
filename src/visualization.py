@@ -248,6 +248,107 @@ def plot_device_topology(
 
 # ---------- animation ----------
 
+def animate_prim_steps(
+    backend,
+    target_n: int,
+    metrics: dict[int, dict] | None = None,
+    cz_fidelities: dict[tuple[int, int], float] | None = None,
+    seed_qubit: int | None = None,
+    excluded_qubits: set[int] | None = None,
+    out_path: str = "gme_prim_animation.gif",
+    color_by: str = "readout_fidelity",
+    interval_ms: int = 700,
+):
+    """Animate Prim's algorithm building the spanning tree edge-by-edge.
+
+    Each frame shows the tree state after one edge is added. Candidate edges
+    in the priority heap are shown as dashed orange. Selected edges are red.
+
+    Returns the saved path.
+    """
+    import heapq
+    import matplotlib.animation as animation
+
+    pos = _device_layout(backend)
+    excluded = excluded_qubits or set()
+
+    # Build CZ-fidelity-weighted adjacency over included qubits
+    nbrs: dict[int, list[tuple[int, float]]] = {}
+    for (a, b), fid in (cz_fidelities or {}).items():
+        if a in excluded or b in excluded:
+            continue
+        w = 1.0 - fid
+        nbrs.setdefault(a, []).append((b, w))
+        nbrs.setdefault(b, []).append((a, w))
+
+    if seed_qubit is None:
+        # Pick the highest-fidelity qubit as seed
+        if metrics:
+            seed_qubit = max(
+                (i for i in nbrs.keys()),
+                key=lambda i: metrics.get(i, {}).get(color_by, 0))
+        else:
+            seed_qubit = next(iter(nbrs))
+
+    # Walk Prim's, recording the tree state at each step
+    in_tree = {seed_qubit}
+    tree_edges: list[tuple[int, int]] = []
+    heap: list[tuple[float, int, int]] = []
+    for nb, w in nbrs.get(seed_qubit, []):
+        heapq.heappush(heap, (w, seed_qubit, nb))
+
+    # Snapshot frames: (in_tree_so_far, tree_edges_so_far, candidate_edges_so_far)
+    frames: list[tuple[set[int], list[tuple[int, int]], list[tuple[int, int]]]] = [
+        (set(in_tree), [], [(u, v) for _, u, v in heap])
+    ]
+
+    while heap and len(in_tree) < target_n:
+        w, u, v = heapq.heappop(heap)
+        if v in in_tree:
+            continue
+        in_tree.add(v)
+        tree_edges.append((u, v))
+        for nb, w2 in nbrs.get(v, []):
+            if nb not in in_tree:
+                heapq.heappush(heap, (w2, v, nb))
+        cands = [(uu, vv) for _, uu, vv in heap if vv not in in_tree]
+        frames.append((set(in_tree), list(tree_edges), cands))
+
+    # Render animation
+    fig, ax = plt.subplots(figsize=(11, 11))
+    n_frames = len(frames)
+
+    def draw_frame(i: int):
+        ax.clear()
+        in_tree_now, tree_edges_now, cand_edges = frames[i]
+
+        # Draw faded background (all device qubits/edges)
+        plot_device_topology(
+            backend, metrics=metrics, cz_fidelities=cz_fidelities,
+            color_by=color_by,
+            highlight_qubits=list(in_tree_now),
+            highlight_edges=tree_edges_now,
+            title=f"Prim's algorithm — step {i}/{n_frames-1}  "
+                  f"(|tree| = {len(in_tree_now)} qubits, {len(tree_edges_now)} edges)",
+            ax=ax, pos=pos, spotlight=True,
+        )
+
+        # Overlay candidate edges as dashed orange
+        for u, v in cand_edges:
+            x1, y1 = pos[u]
+            x2, y2 = pos[v]
+            ax.plot([x1, x2], [y1, y2], color='#ffa726',
+                    linewidth=2.5, linestyle='--', alpha=0.8, zorder=8)
+
+    anim = animation.FuncAnimation(
+        fig, draw_frame, frames=n_frames, interval=interval_ms, repeat=True,
+    )
+    anim.save(out_path, writer=animation.PillowWriter(
+        fps=max(1, 1000 // interval_ms)))
+    plt.close(fig)
+    return out_path
+
+
 def animate_tree_growth(
     backend,
     trees_by_n: dict[int, dict],
