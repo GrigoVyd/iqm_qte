@@ -1,13 +1,14 @@
 """Genuine Multipartite Entanglement (GME) witness for 2D cluster states.
 
 Based on:
-  - Tóth & Gühne, "Detecting Genuine Multipartite Entanglement with Two
+  - G. Tóth, O. Gühne, "Detecting Genuine Multipartite Entanglement with Two
     Local Measurements", Phys. Rev. Lett. 94, 060501 (2005).
     arXiv:quant-ph/0405165
-  - Tóth & Gühne, "Entanglement detection in the stabilizer formalism",
+  - G. Tóth, O. Gühne, "Entanglement detection in the stabilizer formalism",
     Phys. Rev. A 72, 022340 (2005). arXiv:quant-ph/0501020
-  - Zhou et al., "Detecting multipartite entanglement structure with minimal
-    resources", npj Quantum Information 5, 83 (2019). arXiv:1904.05001
+  - Y. Zhou, Q. Zhao, X. Yuan, X. Ma, "Detecting multipartite entanglement
+    structure with minimal resources", npj Quantum Information 5, 83 (2019).
+    arXiv:1904.05001
 
 For a 2-colorable graph state (e.g. 2D cluster on square lattice), GME can be
 certified using only 2 measurement settings:

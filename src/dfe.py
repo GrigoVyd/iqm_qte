@@ -8,8 +8,9 @@ Measure ⟨S⟩ for K randomly-sampled S ∈ S, average. Variance is bounded
 for stabilizer states (Flammia & Liu 2011), so K ≈ O(1/ε²) suffices for
 precision ε.
 
-Reference: Flammia & Liu, "Direct Fidelity Estimation from Few Pauli
-Measurements", Phys. Rev. Lett. 106, 230501 (2011).
+Reference: S. T. Flammia, Y.-K. Liu, "Direct Fidelity Estimation from
+Few Pauli Measurements", Phys. Rev. Lett. 106, 230501 (2011).
+arXiv:1104.4695
 """
 
 from __future__ import annotations

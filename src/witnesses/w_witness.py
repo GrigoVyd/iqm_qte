@@ -23,10 +23,11 @@ def _strip(bs: str) -> str:
 
 
 def parse_counts(counts: dict[str, int], n: int) -> dict[str, int]:
-    """Strip whitespace from bitstrings and keep only n-bit keys."""
+    """Normalise IQM bitstrings: split on spaces, take last register, trim to n bits."""
     out: dict[str, int] = {}
     for bs, c in counts.items():
-        b = _strip(bs)
+        parts = bs.strip().split()
+        b = parts[-1][-n:]
         out[b] = out.get(b, 0) + c
     return out
 
