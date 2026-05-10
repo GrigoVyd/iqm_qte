@@ -7,8 +7,9 @@ We scale noise by **CZ gate folding**: replace each CZ U with U·U·U (α=3),
 or U·U·U·U·U (α=5). Since CZ² = I, an odd number of repetitions has the
 same logical effect as one CZ, but the gate-error budget multiplies by α.
 
-Reference: Temme, Bravyi, Gambetta, "Error mitigation for short-depth
-quantum circuits", PRL 119, 180509 (2017).
+Reference: K. Temme, S. Bravyi, J. M. Gambetta, "Error Mitigation for
+Short-Depth Quantum Circuits", Phys. Rev. Lett. 119, 180509 (2017).
+arXiv:1612.02058
 """
 
 from __future__ import annotations

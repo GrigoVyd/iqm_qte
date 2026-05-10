@@ -442,25 +442,32 @@ Hardware budget: full Emerald + Garnet sweeps (witnesses + ZNE + DFE) ≈ 50 IQM
 
 ## References
 
-**Graph-state GME witness**
+**Graph-state GME witness (§2)**
 
-1. G. Tóth, O. Gühne, *"Detecting Genuine Multipartite Entanglement with Two Local Measurements"*, **Phys. Rev. Lett. 94, 060501 (2005)**. [arXiv:quant-ph/0405165](https://arxiv.org/abs/quant-ph/0405165)
-2. G. Tóth, O. Gühne, *"Entanglement detection in the stabilizer formalism"*, **Phys. Rev. A 72, 022340 (2005)**. [arXiv:quant-ph/0501020](https://arxiv.org/abs/quant-ph/0501020)
-3. Y. Zhou et al., *"Detecting multipartite entanglement structure with minimal resources"*, **npj Quantum Information 5, 83 (2019)**. [arXiv:1904.05001](https://arxiv.org/abs/1904.05001)
+1. G. Tóth, O. Gühne, *"Detecting Genuine Multipartite Entanglement with Two Local Measurements"*, **Phys. Rev. Lett. 94, 060501 (2005)** — [arXiv:quant-ph/0405165](https://arxiv.org/abs/quant-ph/0405165). Source of the inequality $W = \sum_i \langle g_i\rangle \le n-1$ for biseparable states on bipartite graph states.
+2. G. Tóth, O. Gühne, *"Entanglement detection in the stabilizer formalism"*, **Phys. Rev. A 72, 022340 (2005)** — [arXiv:quant-ph/0501020](https://arxiv.org/abs/quant-ph/0501020). Generalises the witness to arbitrary stabilizer states; also the source of the free fidelity lower bound $F \ge \langle P_A\rangle + \langle P_B\rangle - 1$.
+3. Y. Zhou, Q. Zhao, X. Yuan, X. Ma, *"Detecting multipartite entanglement structure with minimal resources"*, **npj Quantum Information 5, 83 (2019)** — [arXiv:1904.05001](https://arxiv.org/abs/1904.05001). Cited as a more recent treatment of the same family of stabilizer-sum witnesses.
 
-**W-state preparation**
+**W states (§1)**
 
-4. F. Diker, *"Deterministic construction of arbitrary W states with quadratically increasing number of two-qubit gates"*, **arXiv:1606.09290 (2016)**.
+4. W. Dür, G. Vidal, J. I. Cirac, *"Three qubits can be entangled in two inequivalent ways"*, **Phys. Rev. A 62, 062314 (2000)** — [arXiv:quant-ph/0005115](https://arxiv.org/abs/quant-ph/0005115). Defines the W class of states.
+5. F. Diker, *"Deterministic construction of arbitrary W states with quadratically increasing number of two-qubit gates"*, **arXiv:1606.09290 (2016)**. The F-gate cascade we use to prepare $|W_n\rangle$ on a chain.
 
-**Mitigation**
+**Graph / cluster states & measurement-based teleportation (§2, §3)**
 
-5. K. Temme, S. Bravyi, J. M. Gambetta, *"Error mitigation for short-depth quantum circuits"*, **PRL 119, 180509 (2017)** — ZNE.
-6. S. Bravyi et al., *"Mitigating measurement errors in multiqubit experiments"*, **Phys. Rev. A 103, 042605 (2021)** — QREM.
-7. S. Flammia, Y.-K. Liu, *"Direct Fidelity Estimation from Few Pauli Measurements"*, **PRL 106, 230501 (2011)** — DFE.
+6. H. J. Briegel, R. Raussendorf, *"Persistent Entanglement in Arrays of Interacting Particles"*, **Phys. Rev. Lett. 86, 910 (2001)** — [arXiv:quant-ph/0004051](https://arxiv.org/abs/quant-ph/0004051). Cluster-state definition.
+7. R. Raussendorf, H. J. Briegel, *"A One-Way Quantum Computer"*, **Phys. Rev. Lett. 86, 5188 (2001)** — [arXiv:quant-ph/0010033](https://arxiv.org/abs/quant-ph/0010033). The MBQC framework the routed-Bell-pair protocol in §3 inherits.
 
-**Graph states**
+**Mitigation stack**
 
-8. H. J. Briegel, R. Raussendorf, *"Persistent entanglement in arrays of interacting particles"*, **PRL 86, 910 (2001)**.
+8. K. Temme, S. Bravyi, J. M. Gambetta, *"Error Mitigation for Short-Depth Quantum Circuits"*, **Phys. Rev. Lett. 119, 180509 (2017)** — [arXiv:1612.02058](https://arxiv.org/abs/1612.02058). The original ZNE paper.
+9. S. Bravyi, S. Sheldon, A. Kandala, D. C. McKay, J. M. Gambetta, *"Mitigating Measurement Errors in Multiqubit Experiments"*, **Phys. Rev. A 103, 042605 (2021)** — [arXiv:2006.14044](https://arxiv.org/abs/2006.14044). The parity-QREM treatment; per-qubit factors $c_q = 1/(1-e_{01}-e_{10})$.
+10. S. T. Flammia, Y.-K. Liu, *"Direct Fidelity Estimation from Few Pauli Measurements"*, **Phys. Rev. Lett. 106, 230501 (2011)** — [arXiv:1104.4695](https://arxiv.org/abs/1104.4695). DFE, used as a cross-check in legacy notebooks 01/02.
+
+**CHSH / Bell-state fidelity-witness (§3)**
+
+11. J. F. Clauser, M. A. Horne, A. Shimony, R. A. Holt, *"Proposed Experiment to Test Local Hidden-Variable Theories"*, **Phys. Rev. Lett. 23, 880 (1969)**. The CHSH inequality used in the routed-Bell game.
+12. B. S. Cirel'son, *"Quantum generalizations of Bell's inequality"*, **Lett. Math. Phys. 4, 93 (1980)**. The $|S| \le 2\sqrt 2$ bound.
 
 ---
 
