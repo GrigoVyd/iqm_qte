@@ -130,11 +130,11 @@ section#s1-cover .stage {
 .tag.ink   { background: var(--ink); }
 
 /* Headings */
-h1 { font-size: 56px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 14px 0; }
-h2 { font-size: 40px; font-weight: 700; letter-spacing: -0.015em; margin: 0; line-height: 1.16; color: var(--ink); }
-h3 { font-size: 16px; font-weight: 600; color: var(--indigo); margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.07em; }
-p, li, td, th { font-size: 17px; line-height: 1.6; }
-p.lead { font-size: 22px; line-height: 1.45; color: var(--ink); }
+h1 { font-size: 60px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 14px 0; }
+h2 { font-size: 38px; font-weight: 700; letter-spacing: -0.015em; margin: 0; line-height: 1.18; color: var(--ink); }
+h3 { font-size: 17px; font-weight: 600; color: var(--indigo); margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.07em; }
+p, li, td, th { font-size: 18px; line-height: 1.6; }
+p.lead { font-size: 22px; line-height: 1.5; color: var(--ink); }
 strong { color: var(--ink); }
 em { color: var(--coral); font-style: normal; font-weight: 600; }
 ul { padding-left: 22px; margin: 6px 0; }
@@ -356,6 +356,69 @@ td.win { color: var(--teal); font-weight: 700; }
 }
 .kpi b { display: block; font-size: 28px; color: var(--coral); line-height: 1.1; }
 .kpi .lbl { display: block; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #666; margin-top: 4px; }
+
+/* W-state illustration (panel 5) */
+.wstate-illustration {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  padding: 14px 18px;
+  border-radius: 10px;
+  border-left: 4px solid var(--indigo);
+  box-shadow: 0 2px 6px rgba(26, 26, 46, 0.05);
+  font-family: 'Iowan Old Style', Georgia, serif;
+  font-size: 19px;
+  margin: 4px 0;
+}
+.wstate-illustration .wstate-term {
+  background: var(--lavender);
+  color: var(--indigo);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+.wstate-illustration .wstate-plus { color: #888; padding: 0 4px; }
+.wstate-illustration .wstate-divisor {
+  margin-left: auto;
+  font-style: italic;
+  color: #555;
+}
+
+/* Quantum vs classical comparison boxes */
+.qc-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 8px 0;
+}
+.qc-box {
+  background: white;
+  border-radius: 10px;
+  padding: 14px 18px;
+  box-shadow: 0 2px 8px rgba(26, 26, 46, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.qc-box.quantum  { border-left: 5px solid var(--teal); }
+.qc-box.classical { border-left: 5px solid #999; opacity: 0.92; }
+.qc-tag {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--teal);
+}
+.qc-box.classical .qc-tag { color: #777; }
+.qc-val {
+  font-family: 'Iowan Old Style', Georgia, serif;
+  font-size: 22px;
+  color: var(--ink);
+  font-weight: 600;
+}
+.qc-sub { font-size: 13px; color: #666; }
 
 /* Big formula card */
 .formula {
