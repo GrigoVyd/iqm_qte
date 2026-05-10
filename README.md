@@ -70,7 +70,27 @@ Same F-gate W preparation across n ∈ {5, 10, 15, 19} on **both** Emerald and G
 
 The non-linear witness rules out the classical single-excitation mixture decisively (≥ +25σ) at every n on both chips, even where Z-basis fidelity to ideal-|W⟩ has dropped below 0.5. Z-fidelity tracks chain quality and decays roughly exponentially in n, as expected from the F-gate cascade depth.
 
-### 6. Empirical-fidelity tree selection (Anna's edge map → Prim's)
+### 6. Routed Bell pair via measurement-based teleportation (Garnet)
+
+Pick a path A–q₁–…–B through the cluster, measure all internals in X
+(and any 2D off-path neighbours in Z). What remains on (A, B) is locally
+equivalent to a Bell pair, with a Pauli byproduct determined by the
+internal-X outcomes. We correct the byproduct in postprocessing and verify
+both Bell fidelity and the CHSH inequality at the endpoints.
+
+| Path L | F (with CZ) | F (no-CZ control) | \|S\| (with) | \|S\| (no-CZ) | Bell 3σ | CHSH 3σ |
+|--------|-------------|-------------------|------------|------------|---------|---------|
+| 3 | **0.895** | 0.494 | **2.500** | 1.384 | ✓ | ✓ |
+| 5 | **0.819** | 0.493 | **2.222** | 1.413 | ✓ | ✓ |
+| 7 | **0.743** | 0.495 | 1.918 | 1.330 | ✓ | ✗ |
+
+Bell entanglement is certified at every L; CHSH violates the classical
+bound (\|S\| > 2) at L=3 and L=5 and lands just below at L=7. The no-CZ
+control flatlines at the separable bound F=0.5 and the maximum-mixture
+\|S\|=√2 — exactly the expected behaviour of a state with no cluster
+entanglement to extract from. Implementation: [src/witnesses/routed_bell.py](src/witnesses/routed_bell.py).
+
+### 7. Empirical-fidelity tree selection (Anna's edge map → Prim's)
 
 Measure $F_{ij} = (1+\langle X_iZ_j\rangle+\langle Z_iX_j\rangle+\langle Y_iY_j\rangle)/4$ on every native CZ pair (greedy edge-coloring → matchings: 4 matchings cover all 30 Garnet edges and all 81 Emerald edges). Plug $w(i,j)=1-F_{ij}^{\text{measured}}$ into the same multi-start Prim's MST as the calibration tree. Head-to-head on hardware:
 
@@ -83,7 +103,7 @@ Measure $F_{ij} = (1+\langle X_iZ_j\rangle+\langle Z_iX_j\rangle+\langle Y_iY_j\
 
 The empirical tree wins on every metric on both devices. On Emerald n=20 it picks an entirely different qubit set (qubits 0–13/19/23/24/32/33/40, vs the calibration tree's 22-53 region), and the change **flips F_lb from negative to positive** — a real qualitative win, not just a numerical nudge. Saved at [empirical_vs_calibration.png](experiments/consolidated_results/empirical_vs_calibration.png).
 
-### 7. Routing strategies head-to-head
+### 8. Routing strategies head-to-head
 
 Same n=15 W-state circuit, two routing approaches in one batched Garnet job for direct comparison (from the consolidated run):
 
