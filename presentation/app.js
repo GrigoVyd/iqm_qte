@@ -1,10 +1,23 @@
-// app.js — animations, dot nav, keyboard, fullscreen.
+// app.js — animations, dot nav, keyboard, fullscreen, stage scaling.
 
 (function () {
   const deck = document.getElementById("deck");
   const sections = Array.from(deck.querySelectorAll("section.panel"));
   const dotsHost = document.getElementById("dots");
   const fsBtn = document.getElementById("fs");
+
+  // ---------- Fixed-stage scale-to-fit ----------
+  // The .stage element is 1600x900 logical px. We scale it to fit the
+  // current viewport while preserving aspect ratio (letter-box around it).
+  const STAGE_W = 1600, STAGE_H = 900;
+  function setStageScale() {
+    const sx = window.innerWidth / STAGE_W;
+    const sy = window.innerHeight / STAGE_H;
+    const s = Math.min(sx, sy);
+    document.documentElement.style.setProperty("--stage-scale", String(s));
+  }
+  setStageScale();
+  window.addEventListener("resize", setStageScale);
 
   // ---------- dots ----------
   sections.forEach((sec, i) => {
@@ -45,6 +58,10 @@
 
   // ---------- keyboard ----------
   document.addEventListener("keydown", (e) => {
+    if (lightbox && lightbox.classList.contains("open")) {
+      if (e.key === "Escape") closeLightbox();
+      return; // swallow nav while lightbox open
+    }
     if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === " " || e.key === "PageDown") {
       e.preventDefault(); stepTo(currentIdx + 1);
     } else if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp") {
@@ -52,6 +69,40 @@
     } else if (e.key === "Home") { e.preventDefault(); stepTo(0); }
     else if (e.key === "End") { e.preventDefault(); stepTo(sections.length - 1); }
     else if (e.key.toLowerCase() === "f") { toggleFullscreen(); }
+  });
+
+  // ---------- click-to-zoom lightbox ----------
+  const lightbox = document.getElementById("lightbox");
+  const lbImg = document.getElementById("lightbox-img");
+  const lbCap = document.getElementById("lightbox-cap");
+  const lbClose = document.getElementById("lightbox-close");
+
+  function openLightbox(src, caption) {
+    if (!lightbox) return;
+    lightbox.hidden = false;
+    requestAnimationFrame(() => lightbox.classList.add("open"));
+    lbImg.src = src;
+    lbImg.alt = caption || "";
+    lbCap.textContent = caption || "";
+  }
+  function closeLightbox() {
+    if (!lightbox) return;
+    lightbox.classList.remove("open");
+    setTimeout(() => { lightbox.hidden = true; lbImg.src = ""; }, 240);
+  }
+  document.querySelectorAll(".figure").forEach((fig) => {
+    fig.addEventListener("click", () => {
+      const img = fig.querySelector("img");
+      if (!img) return;
+      // Use the next sibling .fig-cap text if present
+      const next = fig.nextElementSibling;
+      const cap = (next && next.classList.contains("fig-cap")) ? next.textContent.trim() : (img.alt || "");
+      openLightbox(img.src, cap);
+    });
+  });
+  if (lbClose) lbClose.addEventListener("click", closeLightbox);
+  if (lightbox) lightbox.addEventListener("click", (e) => {
+    if (e.target === lightbox) closeLightbox();   // click backdrop only
   });
 
   // ---------- fullscreen ----------
