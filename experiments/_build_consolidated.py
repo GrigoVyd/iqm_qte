@@ -862,6 +862,57 @@ print("loaded:", list(edge_data))
 F_per_device = {dev: {tuple(d["edge"]): d["F"] for d in edge_data[dev]}
                  for dev in edge_data}"""))
 
+cells.append(md("""### Pair-fidelity heatmap
+
+Same data viewed as an $N\\times N$ symmetric matrix. Off-diagonal cells
+correspond to native CZ pairs — a green cell at $(i,j)$ means the device
+prepared a high-fidelity entangled pair on those qubits. White = no native
+CZ between $i$ and $j$. The colour bar starts at $F=0.5$ (the entanglement
+threshold) so any visible non-white cell is automatically certified
+entangled."""))
+
+cells.append(code("""# Pair-fidelity heatmap. Non-native pairs are masked white so the eye sees
+# only the device's actual CZ edges; the diagonal is masked too.
+# Annotate small devices (Garnet) but not Emerald (54x54 cells are too small).
+fig, axes = plt.subplots(1, len(F_per_device), figsize=(11*len(F_per_device), 9))
+if len(F_per_device) == 1:
+    axes = [axes]
+for ax, (dev, F) in zip(axes, F_per_device.items()):
+    nq = DEVICES[dev].num_qubits
+    M = np.full((nq, nq), np.nan)
+    for (a, b), v in F.items():
+        M[a, b] = v; M[b, a] = v
+    cmap = plt.cm.RdYlGn.copy()
+    cmap.set_bad(color="#f5f5f7")   # match plot_device_topology bg
+    im = ax.imshow(M, cmap=cmap, vmin=0.5, vmax=1.0, aspect="equal",
+                    interpolation="nearest")
+    if nq <= 20:
+        # Annotate every cell on small devices
+        for (a, b), v in F.items():
+            c = "black" if 0.78 <= v <= 0.93 else "white"
+            ax.text(b, a, f"{v:.2f}", ha="center", va="center",
+                    fontsize=8, color=c, fontweight="bold")
+            ax.text(a, b, f"{v:.2f}", ha="center", va="center",
+                    fontsize=8, color=c, fontweight="bold")
+    ax.set_xticks(range(nq)); ax.set_yticks(range(nq))
+    ax.set_xticklabels([str(i) for i in range(nq)], fontsize=8, rotation=0)
+    ax.set_yticklabels([str(i) for i in range(nq)], fontsize=8)
+    ax.set_xlabel("Qubit j", fontsize=11)
+    ax.set_ylabel("Qubit i", fontsize=11)
+    fmin = min(F.values()); fmean = sum(F.values())/len(F); fmax = max(F.values())
+    ax.set_title(f"{dev}  —  pair-fidelity heatmap\\n"
+                  f"min {fmin:.2f}  ·  mean {fmean:.2f}  ·  max {fmax:.2f}  ·  "
+                  f"{len(F)} native CZ pairs",
+                  fontsize=12, fontweight="bold")
+    cb = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cb.set_label("F_ij   ( > 0.5  ⇒ entangled )", fontsize=10)
+    cb.ax.tick_params(labelsize=9)
+plt.suptitle("Measured pair fidelities — every native CZ edge",
+              fontsize=15, fontweight="bold", y=1.00)
+plt.tight_layout()
+plt.savefig(OUT / "edge_heatmap_combined.png", dpi=130, bbox_inches="tight")
+plt.show()"""))
+
 cells.append(md("""### Edge map on the actual chip layout
 
 Below we render every CZ-capable edge on each device's *physical* layout
@@ -895,36 +946,6 @@ plt.tight_layout()
 plt.savefig(OUT / "edge_map_chips.png", dpi=130, bbox_inches="tight")
 plt.show()"""))
 
-cells.append(md("""### Pair-fidelity heatmap (compact view)
-
-Same data, viewed as an $N\\times N$ symmetric matrix — handy for spotting
-*regions* of weakness on the chip rather than just individual bad edges."""))
-
-cells.append(code("""class _R:
-    def __init__(self, d):
-        self.edge = tuple(d["edge"]); self.F = d["F"]; self.sigma_F = d["sigma_F"]
-        self.z_score = d["z_score"]; self.entangled_3sigma = d["entangled_3sigma"]
-        self.entangled_meanonly = d["entangled_meanonly"]
-        for k in ("matching_id","shots","e_XZ","e_ZX","e_YY"):
-            setattr(self, k, d.get(k))
-results_obj = {dev: [_R(d) for d in edge_data[dev]] for dev in edge_data}
-
-fig, axes = plt.subplots(1, len(results_obj), figsize=(8*len(results_obj), 7))
-if len(results_obj) == 1:
-    axes = [axes]
-for ax, dev in zip(axes, results_obj):
-    nq = DEVICES[dev].num_qubits
-    M = np.full((nq, nq), np.nan)
-    for r in results_obj[dev]:
-        a, b = r.edge
-        M[a, b] = r.F; M[b, a] = r.F
-    im = ax.imshow(M, cmap="RdYlGn", vmin=0.6, vmax=1.0)
-    ax.set_xlabel("Qubit j"); ax.set_ylabel("Qubit i")
-    ax.set_title(f"{dev}  —  F_ij heatmap", fontsize=12, fontweight="bold")
-    plt.colorbar(im, ax=ax, label="F_ij  (>0.5 = entangled)")
-plt.tight_layout()
-plt.savefig(OUT / "edge_heatmap_combined.png", dpi=130, bbox_inches="tight")
-plt.show()"""))
 
 cells.append(md("""### Head-to-head: same $n$, two trees
 

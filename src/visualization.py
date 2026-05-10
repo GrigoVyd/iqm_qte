@@ -233,12 +233,17 @@ def plot_device_topology(
     BP_COLORS = {0: '#3aa56b', 1: '#7b3aa5'}   # green, purple — IQM dashboard palette
 
     # --- Layer 1: dim background edges ---
+    # backend.coupling_map iterates *directed* edges; on some IQM devices
+    # each pair appears exactly once (e.g. Garnet returns (1,0) but never
+    # (0,1)). De-duplicate by the normalised tuple instead of relying on a<b.
+    seen_undirected: set[tuple[int, int]] = set()
     for a, b in backend.coupling_map:
-        if a >= b:
+        e = (min(a, b), max(a, b))
+        if e in seen_undirected:
             continue
-        x1, y1 = pos[a]
-        x2, y2 = pos[b]
-        e = (a, b)
+        seen_undirected.add(e)
+        x1, y1 = pos[e[0]]
+        x2, y2 = pos[e[1]]
         if e in hi_edges:
             continue   # drawn later in the highlight layer
         col = _cz_color(cz_fidelities.get(e) if cz_fidelities else None)
