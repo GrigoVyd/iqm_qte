@@ -240,6 +240,193 @@ def plot_edge_map(results: Sequence[EdgeResult], backend=None, *,
     return fig
 
 
+def plot_bottleneck_map(
+    results: Sequence[EdgeResult],
+    backend,
+    *,
+    save_path: str | None = None,
+    title: str | None = None,
+    excluded_qubits: Iterable[int] | None = None,
+    excluded_edges: Iterable[Edge] | None = None,
+    figsize: tuple[float, float] = (13, 13),
+    annotate_qubits: bool = True,
+    show_weakest: bool = True,
+):
+    """Polished single-chip "entanglement bottleneck" view.
+
+    Draws the device's exact diamond-grid layout, with every measured CZ pair
+    coloured by its graph-state fidelity F_ij (RdYlGn from 0.5 to 1.0 — the
+    bottom of the colorbar matches the entanglement threshold).
+
+    Highlights:
+      - the weakest measured edge (dashed black overlay);
+      - the weakest qubit by mean incident F (black double ring);
+      - excluded couplers / qubits (dashed light-gray + open circles).
+
+    Title gets a one-line statistical summary; bottom legend explains the
+    three accent styles.
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as patches
+    from matplotlib.lines import Line2D
+    from matplotlib.colors import Normalize
+    from src.visualization import _device_layout
+
+    pos = _device_layout(backend)
+    nq = backend.num_qubits
+    by_edge = {_norm(r.edge): r for r in results}
+    measured_edges = set(by_edge.keys())
+    all_edges = {_norm(e) for e in backend.coupling_map}
+    expl_excl_edges = {_norm(e) for e in (excluded_edges or [])}
+    excluded_set_q = set(excluded_qubits or ())
+
+    # Edges that aren't in today's measurement set count as excluded
+    not_measured = (all_edges - measured_edges) | expl_excl_edges
+
+    # Per-qubit Q = mean F over incident *measured* edges.
+    incidence: dict[int, list[float]] = {}
+    for (a, b), r in by_edge.items():
+        incidence.setdefault(a, []).append(r.F)
+        incidence.setdefault(b, []).append(r.F)
+    q_score = {q: float(np.mean(fs)) for q, fs in incidence.items()}
+
+    # Discover weakest edge & qubit
+    weakest_edge = min(by_edge.values(), key=lambda r: r.F) if by_edge else None
+    if q_score:
+        weakest_qubit = min(q_score, key=lambda k: q_score[k])
+    else:
+        weakest_qubit = None
+
+    # Qubits that have *no* measured incident edge → effectively excluded
+    auto_excluded_q = {q for q in range(nq) if q not in incidence and q not in excluded_set_q}
+    excluded_q_total = excluded_set_q | auto_excluded_q
+
+    fig, ax = plt.subplots(figsize=figsize)
+    cmap = plt.cm.RdYlGn
+    norm = Normalize(vmin=0.5, vmax=1.0)
+
+    # --- background: excluded couplers as dashed light-gray ---
+    for e in not_measured:
+        if e[0] not in pos or e[1] not in pos:
+            continue
+        x1, y1 = pos[e[0]]; x2, y2 = pos[e[1]]
+        ax.plot([x1, x2], [y1, y2], color="#bdbdbd", linewidth=1.6,
+                 linestyle="--", alpha=0.85, zorder=1)
+
+    # --- measured edges, coloured by F ---
+    for e, r in by_edge.items():
+        x1, y1 = pos[e[0]]; x2, y2 = pos[e[1]]
+        ax.plot([x1, x2], [y1, y2], color=cmap(norm(r.F)),
+                 linewidth=4.5, alpha=0.95, zorder=2,
+                 solid_capstyle="round")
+
+    # --- weakest-edge overlay (dashed black) ---
+    if show_weakest and weakest_edge is not None:
+        a, b = weakest_edge.edge
+        x1, y1 = pos[a]; x2, y2 = pos[b]
+        ax.plot([x1, x2], [y1, y2], color="#1a1a1a", linewidth=4.0,
+                 linestyle=(0, (4, 3)), zorder=4, solid_capstyle="round")
+
+    # --- nodes ---
+    R_MEAS = 0.34
+    R_EXCL = 0.32
+    for q in range(nq):
+        if q not in pos:
+            continue
+        x, y = pos[q]
+        if q in excluded_q_total:
+            ax.add_patch(patches.Circle((x, y), radius=R_EXCL,
+                                          facecolor="white",
+                                          edgecolor="#bdbdbd",
+                                          linewidth=1.2, linestyle="--",
+                                          zorder=5))
+            if annotate_qubits:
+                ax.text(x, y, f"QB{q+1}", ha="center", va="center",
+                         fontsize=7.5, color="#9e9e9e", zorder=6)
+            continue
+        Q = q_score.get(q, float("nan"))
+        col = cmap(norm(Q)) if not math.isnan(Q) else (0.85, 0.85, 0.85, 1.0)
+        ax.add_patch(patches.Circle((x, y), radius=R_MEAS,
+                                      facecolor=col,
+                                      edgecolor="white",
+                                      linewidth=1.5, zorder=5))
+        if annotate_qubits:
+            txt_col = "white" if (Q < 0.83 or Q > 0.93) else "black"
+            ax.text(x, y, f"QB{q+1}", ha="center", va="center",
+                     fontsize=8.5, color=txt_col, fontweight="bold", zorder=6)
+
+    # --- weakest-qubit overlay (black double ring) ---
+    if show_weakest and weakest_qubit is not None and weakest_qubit in pos:
+        x, y = pos[weakest_qubit]
+        ax.add_patch(patches.Circle((x, y), radius=R_MEAS + 0.18,
+                                      facecolor="none", edgecolor="black",
+                                      linewidth=2.0, zorder=7))
+
+    # --- frame ---
+    ax.set_aspect("equal")
+    ax.set_xticks([]); ax.set_yticks([])
+    for s in ("top", "right", "left", "bottom"):
+        ax.spines[s].set_visible(False)
+    ax.set_facecolor("#fbfbfd")
+    xs = [p[0] for p in pos.values()]
+    ys = [p[1] for p in pos.values()]
+    pad = 1.2
+    ax.set_xlim(min(xs) - pad, max(xs) + pad)
+    ax.set_ylim(min(ys) - pad, max(ys) + pad)
+
+    # --- title + subtitle ---
+    n_meas = len(by_edge); n_total = len(all_edges)
+    if results:
+        Fs = [r.F for r in results]
+        f_min, f_mean = min(Fs), float(np.mean(Fs))
+        weakest = weakest_edge
+        we_str = (f"min F = {f_min:.3f} on QB{weakest.edge[0]+1}-QB{weakest.edge[1]+1}"
+                  if weakest else f"min F = {f_min:.3f}")
+        wq_str = (f"weakest qubit QB{weakest_qubit+1} (Q={q_score[weakest_qubit]:.3f})"
+                  if weakest_qubit is not None else "")
+        shots_str = (f" · {results[0].shots} shots/circuit"
+                     if getattr(results[0], "shots", None) else "")
+        subtitle = (f"{n_meas}/{n_total} edges measured{shots_str} · "
+                    f"mean F = {f_mean:.3f}, {we_str}, {wq_str}")
+    else:
+        subtitle = "no measurements"
+    full_title = title or "Entanglement bottleneck map"
+    ax.set_title(f"{full_title}\n{subtitle}", fontsize=13,
+                  fontweight="bold", pad=14)
+
+    # --- colorbar (right) ---
+    sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap); sm.set_array([])
+    cb = plt.colorbar(sm, ax=ax, fraction=0.04, pad=0.02, shrink=0.85)
+    cb.set_label("graph-state fidelity F  (separable bound = 0.5)",
+                  fontsize=11)
+    cb.ax.tick_params(labelsize=10)
+
+    # --- bottom legend ---
+    legend_handles = []
+    if show_weakest and weakest_edge is not None:
+        we = weakest_edge
+        legend_handles.append(Line2D([0], [0], color="#1a1a1a", linewidth=4.0,
+                                       linestyle=(0, (4, 3)),
+                                       label=f"weakest edge (QB{we.edge[0]+1}–QB{we.edge[1]+1})"))
+    if show_weakest and weakest_qubit is not None:
+        legend_handles.append(Line2D([0], [0], marker="o", color="w",
+                                       markerfacecolor="white",
+                                       markeredgecolor="black", markeredgewidth=2,
+                                       markersize=14,
+                                       label=f"weakest qubit (QB{weakest_qubit+1})"))
+    legend_handles.append(Line2D([0], [0], color="#bdbdbd", linewidth=1.8,
+                                   linestyle="--",
+                                   label="excluded coupler (not in today's calibration)"))
+    ax.legend(handles=legend_handles, loc="upper center",
+              bbox_to_anchor=(0.5, -0.02), ncol=len(legend_handles),
+              frameon=False, fontsize=10)
+
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=130, bbox_inches="tight")
+    return fig
+
+
 def fidelity_heatmap(results: Sequence[EdgeResult], backend, *,
                       save_path: str | None = None, title: str | None = None):
     """N x N symmetric F-matrix heatmap (NaN where edge is not native)."""

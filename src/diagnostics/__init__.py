@@ -8,6 +8,7 @@ from src.diagnostics.edge_bell_map import (
     expectation_from_counts,
     fidelity_map,
     get_coupling_edges,
+    plot_bottleneck_map,
     plot_edge_map,
     run_edge_map,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "expectation_from_counts",
     "fidelity_map",
     "get_coupling_edges",
+    "plot_bottleneck_map",
     "plot_edge_map",
     "run_edge_map",
 ]

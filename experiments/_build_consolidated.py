@@ -913,38 +913,45 @@ plt.tight_layout()
 plt.savefig(OUT / "edge_heatmap_combined.png", dpi=130, bbox_inches="tight")
 plt.show()"""))
 
-cells.append(md("""### Edge map on the actual chip layout
+cells.append(md("""### Bottleneck map — every native CZ pair on the actual chip layout
 
-Below we render every CZ-capable edge on each device's *physical* layout
-(same diamond grid as the IQM Resonance dashboard) coloured by the measured
-$F_{ij}$. Green = excellent pair, yellow = mediocre, red = weak. This is
-the most direct picture of where each chip is doing well, and where it
-isn't, on this particular calibration day."""))
+Each chip is rendered on its real diamond-grid layout (matching the IQM
+Resonance dashboard). Each native CZ edge is coloured by the measured
+graph-state fidelity $F_{ij}$ (RdYlGn from 0.5 to 1.0 — the bottom of the
+colour scale is the entanglement threshold). Each qubit's circle is
+coloured by its **bottleneck score** $Q_q = \\overline{F}_q$, the mean
+of incident measured edges.
 
-cells.append(code("""# Per-device chip layout coloured by measured F_ij. Uses the same
-# plot_device_topology helper as elsewhere — measured F replaces calibration
-# CZ fidelity in the cz_fidelities argument, so the existing colormap
-# (RdYlGn normalised to [0.85, 1.0]) lights up the weak edges in red.
-fig, axes = plt.subplots(1, len(F_per_device), figsize=(11*len(F_per_device), 9.5))
-if len(F_per_device) == 1:
-    axes = [axes]
-for ax, (dev, F) in zip(axes, F_per_device.items()):
-    backend = DEVICES[dev]
-    qm, _ = get_qubit_metrics(backend)
-    metrics = {q: {"readout_fidelity": qm.get(q, {}).get("readout_fidelity", float("nan"))}
-               for q in range(backend.num_qubits)}
-    fmin = min(F.values()); fmean = sum(F.values())/len(F); fmax = max(F.values())
-    plot_device_topology(
-        backend, metrics=metrics, cz_fidelities=F,
-        color_by="readout_fidelity",
-        title=f"{dev}  —  measured F_ij  ·  min {fmin:.2f} / mean {fmean:.2f} / max {fmax:.2f}",
-        ax=ax, pos=_device_layout(backend), show_labels=True, spotlight=False,
+Three accents:
+
+* dashed black line — the **weakest measured edge** on the chip;
+* black double ring — the **weakest qubit** by $Q$;
+* dashed grey — couplers that weren't in today's calibration / weren't
+  measured (greyed out so the eye reads them as exclusion, not failure).
+
+Use this view to localise *where* each chip is doing well and where it
+isn't on the calibration day of this run."""))
+
+cells.append(code("""from src.diagnostics import plot_bottleneck_map
+
+# One full-size bottleneck map per device (separate figures so each gets
+# the full 13x13 canvas the chip layout needs to be readable).
+class _R:
+    def __init__(self, d):
+        self.edge = tuple(d["edge"]); self.F = d["F"]; self.sigma_F = d["sigma_F"]
+        self.z_score = d["z_score"]; self.entangled_3sigma = d["entangled_3sigma"]
+        self.entangled_meanonly = d["entangled_meanonly"]
+        for k in ("matching_id","shots","e_XZ","e_ZX","e_YY"):
+            setattr(self, k, d.get(k))
+results_obj = {dev: [_R(d) for d in edge_data[dev]] for dev in edge_data}
+
+for dev in results_obj:
+    plot_bottleneck_map(
+        results_obj[dev], DEVICES[dev],
+        title=f"Entanglement bottleneck map — IQM {dev.capitalize()}  (chip layout)",
+        save_path=str(OUT / f"bottleneck_{dev}.png"),
     )
-fig.suptitle("Anna's edge-Bell map  —  measured 2-qubit graph-state fidelity per native CZ pair",
-             fontsize=14, fontweight="bold", y=0.995)
-plt.tight_layout()
-plt.savefig(OUT / "edge_map_chips.png", dpi=130, bbox_inches="tight")
-plt.show()"""))
+    plt.show()"""))
 
 
 cells.append(md("""### Head-to-head: same $n$, two trees
