@@ -1361,6 +1361,91 @@ if routed_data:
     plt.savefig(OUT / "routed_bell_garnet.png", dpi=130, bbox_inches="tight")
     plt.show()"""))
 
+cells.append(md("""### Visualising the routed paths on the Garnet chip
+
+Each panel below shows one of the three routed paths on Garnet's actual
+diamond-grid layout. The two endpoints A and B are ringed in red; the
+internal qubits (measured in X) sit in between, joined by the cluster's
+CZ edges. Edge colour is the measured pair-fidelity $F_{ij}$ from §2.4 —
+so we can see at a glance whether a chosen path goes through strong
+(green) or weak (yellow/orange) couplers, which directly limits the Bell
+fidelity attainable at the endpoints."""))
+
+cells.append(code("""# Per-L chip-layout view of the routed Bell paths.
+backend_g = backend_garnet
+qm_g, _ = get_qubit_metrics(backend_g)
+metrics_g = {q: {"readout_fidelity": qm_g.get(q, {}).get("readout_fidelity", float("nan"))}
+              for q in range(backend_g.num_qubits)}
+F_g = F_per_device.get("garnet", {})
+pos_g = _device_layout(backend_g)
+
+if routed_data:
+    Ls = sorted(int(k) for k in routed_data)
+    fig, axes = plt.subplots(1, len(Ls), figsize=(5*len(Ls), 5.2))
+    if len(Ls) == 1:
+        axes = [axes]
+    for ax, L in zip(axes, Ls):
+        blob = routed_data[str(L)]
+        path = blob["path"]
+        edges = [(path[i], path[i+1]) for i in range(len(path)-1)]
+        bf = blob["with_cz"]["bell_fidelity"]
+        ch = blob["with_cz"]["chsh"]
+        plot_device_topology(
+            backend_g, metrics=metrics_g, cz_fidelities=F_g,
+            color_by="readout_fidelity",
+            highlight_qubits=path, highlight_edges=edges,
+            title=(f"L={L}  ·  A=q{path[0]} → B=q{path[-1]}\\n"
+                    f"F={bf['F']:.3f}  ·  |S|={ch['abs_S']:.3f}"),
+            ax=ax, pos=pos_g, show_labels=True, spotlight=True,
+        )
+    fig.suptitle("Routed Bell-pair paths on Garnet  ·  edge colour = measured F_ij",
+                  fontsize=13, fontweight="bold", y=0.995)
+    plt.tight_layout()
+    plt.savefig(OUT / "routed_paths_garnet.png", dpi=130, bbox_inches="tight")
+    plt.show()"""))
+
+cells.append(md("""### Why the byproduct correction matters
+
+Each shot's internal-X outcome bitstring $m$ determines a Pauli byproduct
+on the residual (A, B) pair. Without correction the corrected estimator is
+just the raw endpoint parity, which on the noiseless target is $\\pm 1$
+with the sign depending on $m$. Averaging over $m$ destructively
+*cancels* the entanglement signature, dropping Bell fidelity well below
+0.5 even when the underlying state is a near-perfect Bell pair.
+
+The bar chart below compares the **corrected** Bell fidelity (proper
+per-shot byproduct lookup) against the **uncorrected** aggregation (no
+sign correction at all) on each $L$. Without the correction step, the
+protocol would be unable to detect the routed entanglement at any L>2."""))
+
+cells.append(code("""if routed_data:
+    Ls = sorted(int(k) for k in routed_data)
+    F_corr = [routed_data[str(L)]["with_cz"]["bell_fidelity"]["F"] for L in Ls]
+    F_unco = [routed_data[str(L)]["with_cz"]["bell_fidelity_uncorrected"]["F"] for L in Ls]
+    sg_co  = [routed_data[str(L)]["with_cz"]["bell_fidelity"]["sigma_F"] for L in Ls]
+    sg_un  = [routed_data[str(L)]["with_cz"]["bell_fidelity_uncorrected"]["sigma_F"] for L in Ls]
+
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    x = np.arange(len(Ls)); w = 0.36
+    ax.bar(x - w/2, F_corr, w, yerr=sg_co, capsize=5, color="#2ca02c",
+           label="corrected (full protocol)", edgecolor="white", linewidth=1.2)
+    ax.bar(x + w/2, F_unco, w, yerr=sg_un, capsize=5, color="#888888",
+           label="uncorrected (no byproduct lookup)", edgecolor="white", linewidth=1.2)
+    for xi, vc, vu in zip(x, F_corr, F_unco):
+        ax.text(xi - w/2, vc + 0.02, f"{vc:.2f}", ha="center", fontsize=10, fontweight="bold")
+        ax.text(xi + w/2, vu + 0.02, f"{vu:.2f}", ha="center", fontsize=10, color="#444")
+    ax.axhline(0.5, color="red", ls="--", linewidth=2, label="separable bound F=0.5")
+    ax.axhline(1.0, color="gray", ls=":", linewidth=1.2, label="ideal F=1.0")
+    ax.set_xticks(x); ax.set_xticklabels([f"L={L}" for L in Ls], fontsize=11)
+    ax.set_ylabel("Bell fidelity F"); ax.set_ylim(0, 1.05)
+    ax.set_title("Garnet routed-Bell — byproduct correction is what makes this work",
+                 fontweight="bold")
+    ax.legend(loc="lower left", fontsize=9, framealpha=0.95)
+    ax.grid(axis="y", alpha=0.25); ax.set_axisbelow(True)
+    plt.tight_layout()
+    plt.savefig(OUT / "routed_bell_correction_benefit.png", dpi=130, bbox_inches="tight")
+    plt.show()"""))
+
 cells.append(md("""---
 
 # Summary
