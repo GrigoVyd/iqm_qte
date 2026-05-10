@@ -858,23 +858,73 @@ else:
     edge_data = json.loads(EDGE_FILE.read_text()) if EDGE_FILE.exists() else {}
 print("loaded:", list(edge_data))
 
-class _R:
+# Build device-shaped F_ij dicts ready for plot_device_topology.
+F_per_device = {dev: {tuple(d["edge"]): d["F"] for d in edge_data[dev]}
+                 for dev in edge_data}"""))
+
+cells.append(md("""### Edge map on the actual chip layout
+
+Below we render every CZ-capable edge on each device's *physical* layout
+(same diamond grid as the IQM Resonance dashboard) coloured by the measured
+$F_{ij}$. Green = excellent pair, yellow = mediocre, red = weak. This is
+the most direct picture of where each chip is doing well, and where it
+isn't, on this particular calibration day."""))
+
+cells.append(code("""# Per-device chip layout coloured by measured F_ij. Uses the same
+# plot_device_topology helper as elsewhere — measured F replaces calibration
+# CZ fidelity in the cz_fidelities argument, so the existing colormap
+# (RdYlGn normalised to [0.85, 1.0]) lights up the weak edges in red.
+fig, axes = plt.subplots(1, len(F_per_device), figsize=(11*len(F_per_device), 9.5))
+if len(F_per_device) == 1:
+    axes = [axes]
+for ax, (dev, F) in zip(axes, F_per_device.items()):
+    backend = DEVICES[dev]
+    qm, _ = get_qubit_metrics(backend)
+    metrics = {q: {"readout_fidelity": qm.get(q, {}).get("readout_fidelity", float("nan"))}
+               for q in range(backend.num_qubits)}
+    fmin = min(F.values()); fmean = sum(F.values())/len(F); fmax = max(F.values())
+    plot_device_topology(
+        backend, metrics=metrics, cz_fidelities=F,
+        color_by="readout_fidelity",
+        title=f"{dev}  —  measured F_ij  ·  min {fmin:.2f} / mean {fmean:.2f} / max {fmax:.2f}",
+        ax=ax, pos=_device_layout(backend), show_labels=True, spotlight=False,
+    )
+fig.suptitle("Anna's edge-Bell map  —  measured 2-qubit graph-state fidelity per native CZ pair",
+             fontsize=14, fontweight="bold", y=0.995)
+plt.tight_layout()
+plt.savefig(OUT / "edge_map_chips.png", dpi=130, bbox_inches="tight")
+plt.show()"""))
+
+cells.append(md("""### Pair-fidelity heatmap (compact view)
+
+Same data, viewed as an $N\\times N$ symmetric matrix — handy for spotting
+*regions* of weakness on the chip rather than just individual bad edges."""))
+
+cells.append(code("""class _R:
     def __init__(self, d):
         self.edge = tuple(d["edge"]); self.F = d["F"]; self.sigma_F = d["sigma_F"]
         self.z_score = d["z_score"]; self.entangled_3sigma = d["entangled_3sigma"]
         self.entangled_meanonly = d["entangled_meanonly"]
         for k in ("matching_id","shots","e_XZ","e_ZX","e_YY"):
             setattr(self, k, d.get(k))
-
 results_obj = {dev: [_R(d) for d in edge_data[dev]] for dev in edge_data}
 
-for dev in results_obj:
-    plot_edge_map(results_obj[dev], backend=DEVICES[dev],
-                   save_path=str(OUT / f"edge_map_{dev}.png"),
-                   title=f"{dev} — measured graph-state fidelity per CZ edge")
-    fidelity_heatmap(results_obj[dev], DEVICES[dev],
-                       save_path=str(OUT / f"edge_heatmap_{dev}.png"))
-    plt.show()"""))
+fig, axes = plt.subplots(1, len(results_obj), figsize=(8*len(results_obj), 7))
+if len(results_obj) == 1:
+    axes = [axes]
+for ax, dev in zip(axes, results_obj):
+    nq = DEVICES[dev].num_qubits
+    M = np.full((nq, nq), np.nan)
+    for r in results_obj[dev]:
+        a, b = r.edge
+        M[a, b] = r.F; M[b, a] = r.F
+    im = ax.imshow(M, cmap="RdYlGn", vmin=0.6, vmax=1.0)
+    ax.set_xlabel("Qubit j"); ax.set_ylabel("Qubit i")
+    ax.set_title(f"{dev}  —  F_ij heatmap", fontsize=12, fontweight="bold")
+    plt.colorbar(im, ax=ax, label="F_ij  (>0.5 = entangled)")
+plt.tight_layout()
+plt.savefig(OUT / "edge_heatmap_combined.png", dpi=130, bbox_inches="tight")
+plt.show()"""))
 
 cells.append(md("""### Head-to-head: same $n$, two trees
 
@@ -966,25 +1016,95 @@ This validates the hypothesis that *measured* per-pair fidelity is a better
 edge cost than *modelled* per-pair fidelity for tree selection on this
 hardware."""))
 
+cells.append(md("""### Visualising the two trees on the chip
+
+Each panel below shows the *same chip*, with the tree from each method
+highlighted in red. Background edge colour is the **measured** $F_{ij}$
+(green = good pair, red = weak), so it's immediately visible why the
+empirical method picks the qubit set it does — it's threading the tree
+through the green edges, while the calibration-cost tree is forced down
+the path the calibration model preferred even where measured $F$ disagrees.
+"""))
+
+cells.append(code("""# Side-by-side chip layouts: calibration tree vs empirical tree, on each device.
+for dev, blob in head_data.items():
+    n = blob["n"]; backend = DEVICES[dev]
+    qm, _ = get_qubit_metrics(backend)
+    metrics = {q: {"readout_fidelity": qm.get(q, {}).get("readout_fidelity", float("nan"))}
+               for q in range(backend.num_qubits)}
+    F = F_per_device.get(dev, {})
+    pos = _device_layout(backend)
+    fig, axes = plt.subplots(1, 2, figsize=(20, 9))
+    for ax, label, full in zip(axes, ("cal", "emp"),
+                                ("calibration cost", "empirical F_ij")):
+        t = blob[label]
+        edges = [tuple(e) for e in t["logical_edges"]]
+        # convert logical edges (indexed into t['qubits']) to physical
+        phys_edges = [(t["qubits"][a], t["qubits"][b]) for a, b in edges]
+        # pull the measured F over the chosen edges for the title
+        Fs = [F.get((min(a,b), max(a,b)), float('nan')) for (a,b) in phys_edges]
+        Fs_clean = [x for x in Fs if not (isinstance(x,float) and np.isnan(x))]
+        title = (f"{dev}, n={n}  —  {full} tree\\n"
+                 f"min F={min(Fs_clean):.3f}, mean F={np.mean(Fs_clean):.3f}  "
+                 f"·  W +QREM = {head_summary[dev][label]['W_qrem']:.2f}  "
+                 f"·  F_lb = {head_summary[dev][label]['F_lb']:+.3f}")
+        plot_device_topology(
+            backend, metrics=metrics, cz_fidelities=F,
+            color_by="readout_fidelity",
+            highlight_qubits=t["qubits"],
+            highlight_edges=phys_edges,
+            title=title, ax=ax, pos=pos, show_labels=True, spotlight=True,
+        )
+    fig.suptitle(f"{dev}  —  calibration-cost tree (left) vs empirical-F tree (right)",
+                 fontsize=15, fontweight="bold", y=0.995)
+    plt.tight_layout()
+    plt.savefig(OUT / f"head_to_head_{dev}.png", dpi=130, bbox_inches="tight")
+    plt.show()"""))
+
+cells.append(md("""### Numbers, side by side
+
+The bar chart below summarises the two trees per device with the three
+hardware quantities we care about: $W_{\\text{raw}}$, $W_{\\text{+QREM}}$,
+and the free fidelity lower bound $F_{lb}$. The horizontal dashed line is
+the GME bound $n-1$; a bar above it certifies multipartite entanglement
+on that tree.
+"""))
+
 cells.append(code("""if head_summary:
-    fig, axes = plt.subplots(1, len(head_summary), figsize=(6*len(head_summary), 4.8),
+    fig, axes = plt.subplots(1, len(head_summary), figsize=(7*len(head_summary), 5.6),
                               squeeze=False)
     for ax, (dev, info) in zip(axes[0], head_summary.items()):
         n = info["n"]; bound = n - 1
         labels = ["cal", "emp"]
-        Wraw  = [info[l]["W_raw"] for l in labels]
+        Wraw  = [info[l]["W_raw"]  for l in labels]
         Wqrem = [info[l]["W_qrem"] for l in labels]
-        x = np.arange(2); w = 0.35
-        ax.bar(x - w/2, Wraw,  w, label="raw",   color="#4c72b0")
-        ax.bar(x + w/2, Wqrem, w, label="+QREM", color="#55a868")
-        ax.axhline(bound, color="red", ls="--", label=f"bound (n-1={bound})")
-        ax.axhline(n,     color="gray", ls=":",  label=f"ideal n={n}")
-        ax.set_xticks(x); ax.set_xticklabels(["calibration\\ncost", "empirical\\nF_ij"])
-        ax.set_ylabel("W"); ax.set_title(f"{dev}, n={n}")
-        ax.legend(loc="lower right", fontsize=8)
-    plt.suptitle("Empirical-F tree vs calibration-cost tree", fontweight="bold")
+        Flb   = [info[l]["F_lb"]   for l in labels]
+        x = np.arange(2); w = 0.32
+        ax.bar(x - w/2, Wraw,  w, label="W raw",   color="#4c72b0", edgecolor="white", linewidth=1.2)
+        ax.bar(x + w/2, Wqrem, w, label="W +QREM", color="#55a868", edgecolor="white", linewidth=1.2)
+        # value labels above each bar
+        for xi, vr, vq in zip(x, Wraw, Wqrem):
+            ax.text(xi - w/2, vr + 0.15, f"{vr:.2f}", ha="center", fontsize=9, color="#2c3e50")
+            ax.text(xi + w/2, vq + 0.15, f"{vq:.2f}", ha="center", fontsize=9, color="#2c3e50")
+        # F_lb annotation just below the x-tick label
+        ax.set_ylim(0, n + 1.5)
+        ymin, ymax = ax.get_ylim()
+        for xi, fl in zip(x, Flb):
+            ax.text(xi, ymax * 0.97, f"F_lb = {fl:+.3f}", ha="center", fontsize=11,
+                     color="#c44569" if fl < 0 else "#2d6a4f", fontweight="bold",
+                     bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="0.8", alpha=0.9))
+        ax.axhline(bound, color="#e74c3c", ls="--", linewidth=2,
+                    label=f"GME bound n-1 = {bound}")
+        ax.axhline(n, color="gray", ls=":", linewidth=1.5, label=f"ideal n = {n}")
+        ax.set_xticks(x); ax.set_xticklabels(["calibration\\ncost", "empirical\\nF_ij"], fontsize=11)
+        ax.set_ylabel("Witness  W"); ax.set_title(f"{dev}, n={n}", fontweight="bold")
+        ax.legend(loc="lower right", fontsize=9, framealpha=0.95)
+        ax.grid(axis="y", alpha=0.25)
+        ax.set_axisbelow(True)
+    plt.suptitle("Empirical-F tree vs calibration-cost tree  —  hardware verdict",
+                  fontsize=14, fontweight="bold")
     plt.tight_layout()
-    plt.savefig(OUT / "empirical_vs_calibration.png", dpi=130)
+    plt.savefig(OUT / "empirical_vs_calibration.png", dpi=130, bbox_inches="tight")
     plt.show()"""))
 
 # ---------------------------------------------------------------------------
