@@ -101,23 +101,22 @@
         <span class="slide-num">04 / 10</span>
       </header>
       <div class="stage-body">
-        <h2>Before any witness: routing the chain onto the chip.</h2>
+        <h2>Same circuit. Same hardware. Where on the chip you put it matters.</h2>
         <div class="cols">
           <div class="col">
-            <p><b>The setup.</b> A W-state circuit is a chain. The IQM Qubit Selector is a great general-purpose layout tool, but for a chain it can pick a layout that requires SWAPs and tanks fidelity.</p>
-            <p>Our beam-search Hamiltonian-path router scores chains directly:</p>
-            <div class="formula" style="font-size:18px;">𝓛 = Σ log F<sub>RO</sub> + Σ log F<sub>CZ</sub> + Σ log P<sub>T₁</sub>(Δt) + Σ log P<sub>T₂</sub>(Δt)</div>
-            <p>Same n=15 W-state, same Garnet job, two layouts:</p>
+            <p><b>The story.</b> A W-state circuit is a 1-D chain — qubits talk only to their neighbours. The IQM Selector is brilliant for arbitrary circuits but doesn't exploit that, so its layout can zig-zag and the transpiler inserts SWAPs.</p>
+            <p>Our <em>beam-search Hamiltonian-path</em> router scores chains by multiplicative log-fidelity:</p>
+            <div class="formula" style="font-size:15px;">𝓛 = Σ log F<sub>RO</sub> + Σ log F<sub>CZ</sub> + Σ log P<sub>T₁</sub>(Δt) + Σ log P<sub>T₂</sub>(Δt)</div>
             <table>
-              <tr><th></th><th>F<sub>z</sub></th><th>⟨W<sub>x</sub>⟩</th><th>σ above 0</th></tr>
-              <tr><td>IQM Selector</td><td>0.31</td><td>+0.085</td><td>+14σ</td></tr>
-              <tr><td><strong>Beam-search</strong></td><td class="win"><b>0.68</b></td><td class="win">+0.114</td><td class="win"><b>+31σ</b></td></tr>
+              <tr><th>n=15 on Garnet</th><th>F<sub>z</sub></th><th>⟨W<sub>x</sub>⟩</th><th>σ above 0</th></tr>
+              <tr><td>IQM Qubit Selector</td><td>0.31</td><td>+0.085</td><td>+14σ</td></tr>
+              <tr><td><strong>Beam-search chain</strong></td><td class="win"><b>0.68</b></td><td class="win">+0.114</td><td class="win"><b>+31σ</b></td></tr>
             </table>
-            <p><em>2× the F<sub>z</sub></em> on the same hardware.</p>
+            <p><b>Free 2× fidelity</b> — same chip, just a router that knows the circuit's shape.</p>
           </div>
           <div class="col">
-            <div class="figure"><img src="assets/results/routing_n15_garnet.png" alt="routing comparison"></div>
-            <p class="fig-cap">n=15 W-state on Garnet · Selector vs beam-search</p>
+            <div class="figure"><img src="assets/results/routing_chains_garnet.png" alt="routing comparison on chip layout"></div>
+            <p class="fig-cap">Both layouts on the actual Garnet chip — the right one (beam-search) follows a clean Hamiltonian path; the left one's chain has to jump diagonally.</p>
           </div>
         </div>
       </div>
@@ -139,16 +138,29 @@
         <h2>With the right routing — our first witness, on both devices.</h2>
         <div class="cols">
           <div class="col">
-            <p><b>Why a non-linear witness?</b> Z-basis statistics alone don't tell |W<sub>n</sub>⟩ apart from a classical mixture of single-excitation strings. The pairwise X-correlator does:</p>
-            <div class="formula coral">⟨X<sub>i</sub> X<sub>j</sub>⟩ = 2/n &nbsp;<small>(quantum)</small> &nbsp;·&nbsp; 0 &nbsp;<small>(classical mixture)</small></div>
-            <table>
-              <tr><th>n</th><th>Garnet σ</th><th>Emerald σ</th></tr>
-              <tr><td>5</td><td class="win">+60σ</td><td class="win">+44σ</td></tr>
-              <tr><td>10</td><td class="win">+29σ</td><td class="win">+26σ</td></tr>
-              <tr><td>15</td><td class="win">+28σ</td><td class="win">+35σ</td></tr>
-              <tr><td><b>19</b></td><td class="win"><b>+26σ</b></td><td class="win"><b>+31σ</b></td></tr>
-            </table>
-            <p style="font-size:14px;">σ from sample-std / √n<sub>pairs</sub>. Every (device, n) gives <em>+25σ to +60σ</em> above 0.</p>
+            <p><b>What's a W state?</b> One excitation, distributed coherently across n qubits:</p>
+            <div class="wstate-illustration">
+              <span class="wstate-term">|10⋯00⟩</span>
+              <span class="wstate-plus">+</span>
+              <span class="wstate-term">|01⋯00⟩</span>
+              <span class="wstate-plus">+ ⋯ +</span>
+              <span class="wstate-term">|00⋯01⟩</span>
+              <span class="wstate-divisor">⁄ √n</span>
+            </div>
+            <p><b>The trap.</b> If you only measure in the Z basis, this looks identical to a *classical* random mixture: one qubit hot, the rest cold. To prove the state is actually <em>quantum</em>, we need a witness that sees coherence — the pairwise X-correlator:</p>
+            <div class="qc-compare">
+              <div class="qc-box quantum">
+                <span class="qc-tag">Quantum</span>
+                <span class="qc-val">⟨X<sub>i</sub> X<sub>j</sub>⟩ = 2/n</span>
+                <span class="qc-sub">on |W<sub>n</sub>⟩ — coherence shows up</span>
+              </div>
+              <div class="qc-box classical">
+                <span class="qc-tag">Classical</span>
+                <span class="qc-val">⟨X<sub>i</sub> X<sub>j</sub>⟩ = 0</span>
+                <span class="qc-sub">on a single-excitation mixture</span>
+              </div>
+            </div>
+            <p style="font-size:14px;">Hardware: every (device, n) gives the witness <em>+25σ to +60σ</em> above the classical 0.</p>
           </div>
           <div class="col">
             <div class="figure"><img src="assets/results/w_sweep_summary.png" alt="W-state sweep"></div>
@@ -353,12 +365,53 @@
     </div>
   </section>
 
-  <!-- 10 · Summary -->
-  <section id="s10-summary" class="panel">
+  <!-- 10 · Outlook · routing-coefficient optimization -->
+  <section id="s10-outlook" class="panel">
+    <div class="stage">
+      <header class="stage-head">
+        <span class="tag coral">Outlook · early result</span>
+        <span class="slide-num">10 / 11</span>
+      </header>
+      <div class="stage-body">
+        <h2>Let the hardware tune the router itself.</h2>
+        <div class="cols">
+          <div class="col">
+            <p>The routing loss has four free weights:</p>
+            <div class="formula" style="font-size:14px;">𝓛 = w<sub>CZ</sub>·Σlog F<sub>CZ</sub> + w<sub>RO</sub>·Σlog F<sub>RO</sub> + w<sub>T₁</sub>·Σlog P<sub>T₁</sub> + w<sub>T₂</sub>·Σlog P<sub>T₂</sub></div>
+            <p style="font-size:15px;"><em>Equal weights is just a guess.</em> So we ran a Nelder–Mead search — each sample's chosen chain executed on Emerald, F<sub>z</sub> to |W<sub>30</sub>⟩ as the objective.</p>
+            <table style="font-size:14px;">
+              <tr><th>weight</th><th>baseline</th><th>tuned</th><th>ratio</th></tr>
+              <tr><td>w<sub>CZ</sub></td><td>1.00</td><td class="hi"><b>3.14</b></td><td class="hi">3.1×</td></tr>
+              <tr><td>w<sub>T₁</sub></td><td>1.00</td><td class="win">1.92</td><td class="win">1.9×</td></tr>
+              <tr><td>w<sub>RO</sub></td><td>1.00</td><td>0.86</td><td>0.9×</td></tr>
+              <tr><td>w<sub>T₂</sub></td><td>1.00</td><td>0.27</td><td>0.3×</td></tr>
+            </table>
+            <p style="font-size:14px;">CZ matters ~3× more than dephasing — quantitatively calibrated to <em>this</em> chip on <em>this</em> day.</p>
+          </div>
+          <div class="col">
+            <div class="kpi-row" style="margin-bottom:12px;">
+              <div class="kpi"><b>0.086</b><span class="lbl">F<sub>z</sub> baseline (1,1,1,1)</span></div>
+              <div class="kpi" style="border-left-color:var(--teal);"><b style="color:var(--teal);">0.212</b><span class="lbl">F<sub>z</sub> tuned</span></div>
+              <div class="kpi" style="border-left-color:var(--ink);"><b style="color:var(--ink);">2.5×</b><span class="lbl">improvement, same chip</span></div>
+            </div>
+            <div class="figure"><img src="assets/results/routing_opt/cross_validation.png" alt="cross validation"></div>
+            <p class="fig-cap">Cross-validation: tuned weights re-used at n = 20…30 — they generalise; n = 20 reaches F<sub>z</sub> = 0.40.</p>
+          </div>
+        </div>
+      </div>
+      <footer class="stage-foot">
+        <span class="foot-mark"><img src="assets/qte_avatar_512.png" alt="Q.te"> Q.te · Witness My Entanglement</span>
+        <span class="foot-tag">ETH Quantum Hackathon · Entanglement track</span>
+      </footer>
+    </div>
+  </section>
+
+  <!-- 11 · Summary -->
+  <section id="s11-summary" class="panel">
     <div class="stage">
       <header class="stage-head">
         <span class="tag">Summary</span>
-        <span class="slide-num">10 / 10</span>
+        <span class="slide-num">11 / 11</span>
       </header>
       <div class="stage-body">
         <h2>What we shipped.</h2>
