@@ -400,6 +400,12 @@ pip install "iqm-client[qiskit]" iqm-qubit-selector qiskit-aer \
             numpy matplotlib scipy jupyter rustworkx networkx
 ```
 
+For an **exact reproduction** of the env we developed against (Python 3.12, Windows) use the frozen lockfile:
+
+```bash
+pip install -r requirements-frozen.txt
+```
+
 **Reproduce every plot offline (no hardware, no IQM token)** — open
 [`experiments/witness_my_entanglement.ipynb`](experiments/witness_my_entanglement.ipynb)
 in JupyterLab and run all. The first cell sets `RERUN_HW = False`
