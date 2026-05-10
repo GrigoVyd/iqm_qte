@@ -46,8 +46,15 @@
   <!-- 3 · Story overview -->
   <section id="s3-story" class="panel">
     <span class="slide-num">03 / 10</span>
-    <span class="tag">Our submission, in one slide</span>
+    <span class="tag">Headline results</span>
     <h2>Three threads, two devices, one notebook.</h2>
+    <div class="kpi-row">
+      <div class="kpi"><b>20</b><span class="lbl">qubit GME · full Garnet chip</span></div>
+      <div class="kpi"><b>+15σ</b><span class="lbl">n=20 GME after QREM+ZNE</span></div>
+      <div class="kpi"><b>+60σ</b><span class="lbl">W-state non-classicality (n=5)</span></div>
+      <div class="kpi"><b>2.50</b><span class="lbl">CHSH |S| · routed Bell L=3</span></div>
+      <div class="kpi"><b>2×</b><span class="lbl">F<sub>z</sub> from beam routing</span></div>
+    </div>
     <div class="cols">
       <div class="col wide">
         <div class="story-card"><h3>Part 1 — W-state thread</h3><div class="body">Diker / F-gate prep · beam-search Hamiltonian-path routing · non-linear pairwise-X witness on Emerald + Garnet for n ∈ {5, 10, 15, 19}.</div></div>
@@ -55,8 +62,8 @@
         <div class="story-card coral"><h3>Part 3 — Routed Bell pair</h3><div class="body">Cluster-MBQC entanglement routing · Bell fidelity + CHSH game on Garnet · path lengths L = 3, 5, 7.</div></div>
       </div>
       <div class="col" style="text-align:center;">
-        <img src="assets/qte_logo_wordmark_1024.png" style="max-width:65%;margin-top:20px;" class="fade-in">
-        <p class="fig-cap" style="margin-top:30px;">All in one notebook<br><span class="pill">experiments/witness_my_entanglement.ipynb</span><br><span style="display:block;margin-top:8px;">~12 batched hardware jobs · reproducible offline via <span class="pill">RERUN_HW=False</span></span></p>
+        <img src="assets/qte_logo_wordmark_1024.png" style="max-width:60%;margin-top:6px;" class="fade-in">
+        <p class="fig-cap" style="margin-top:18px;">All in one notebook<br><span class="pill">experiments/witness_my_entanglement.ipynb</span><br><span style="display:block;margin-top:8px;">~12 batched hardware jobs · reproducible offline via <span class="pill">RERUN_HW=False</span></span></p>
       </div>
     </div>
   </section>
@@ -151,22 +158,24 @@
     <div class="cols">
       <div class="col wide">
         <div class="figure"><img src="assets/results/gme_mitigation_sweep.png" alt="GME mitigation sweep"></div>
-        <p class="fig-cap">Raw → +QREM → +ZNE → +QREM+ZNE (clipped at physical max W=n) on both devices.</p>
+        <p class="fig-cap">Raw → +QREM → +ZNE → +QREM+ZNE (clipped at W=n) on both devices.</p>
       </div>
       <div class="col">
-        <h3>Garnet headline</h3>
+        <h3>Garnet (full chip)</h3>
         <table>
-          <tr><th>n</th><th>bound</th><th>W +QREM</th><th>σ</th></tr>
-          <tr><td>6</td><td>5</td><td>6.04</td><td class="win">+19σ</td></tr>
-          <tr><td>12</td><td>11</td><td>11.98</td><td class="win">+13σ</td></tr>
-          <tr class="hi-row"><td><b>20</b></td><td><b>19</b></td><td class="hi"><b>19.25</b></td><td class="hi" id="qrem20-sigma"><b>+2.5σ</b></td></tr>
+          <tr><th>n</th><th>bound</th><th>W +QREM</th><th>σ</th><th>+QREM+ZNE</th></tr>
+          <tr><td>6</td><td>5</td><td>6.04</td><td class="win">+19σ</td><td class="win">+28σ</td></tr>
+          <tr><td>12</td><td>11</td><td>11.98</td><td class="win">+13σ</td><td class="win">+25σ</td></tr>
+          <tr><td><b>20</b></td><td><b>19</b></td><td class="hi"><b>19.25</b></td><td class="hi" id="qrem20-sigma"><b>+2.5σ</b></td><td class="hi"><b>+15σ</b></td></tr>
         </table>
-        <h3 style="margin-top:18px;">Mitigation stack</h3>
-        <ul>
-          <li><b>Parity-QREM</b> — c<sub>q</sub> = 1/(1−e<sub>01</sub>−e<sub>10</sub>) from device metrics, no extra cal shots</li>
-          <li><b>ZNE</b> — CZ folding (with barriers!) at α ∈ {1, 3, 5}</li>
-          <li><b>Bootstrap σ</b> — 200 shot-level resamples through QREM and the linear fit</li>
-        </ul>
+        <h3 style="margin-top:14px;">Emerald (54 q)</h3>
+        <table>
+          <tr><th>n</th><th>bound</th><th>W +QREM</th><th>σ</th><th>+QREM+ZNE</th></tr>
+          <tr><td>6</td><td>5</td><td>6.06</td><td class="win">+19σ</td><td class="win">+36σ</td></tr>
+          <tr><td>12</td><td>11</td><td>11.88</td><td class="win">+11σ</td><td class="win">+28σ</td></tr>
+          <tr><td>20</td><td>19</td><td>18.11</td><td>−9σ</td><td class="win">+8σ</td></tr>
+        </table>
+        <p style="margin-top:10px;font-size:14px;"><b>Mitigation stack:</b> parity-QREM (no extra cal shots) · ZNE w/ barriers · bootstrap σ through both.</p>
       </div>
     </div>
   </section>
@@ -207,14 +216,15 @@
     <div class="cols">
       <div class="col tight">
         <p>Pick a path A — q₁ — … — B through the cluster. Measure all internals in <em>X</em>. What remains on (A, B) is locally equivalent to |Φ⁺⟩, modulo a Pauli byproduct from the internal outcomes.</p>
-        <div class="formula coral" style="font-size:18px;">F = (1 + ⟨XX⟩<sub>c</sub> + ⟨YY⟩<sub>c</sub> + ⟨ZZ⟩<sub>c</sub>) / 4</div>
-        <table style="margin-top:14px;">
-          <tr><th>L</th><th>F (with CZ)</th><th>F (no-CZ)</th><th>|S| (with)</th></tr>
-          <tr><td>3</td><td class="win">0.895</td><td>0.494</td><td class="win">2.50</td></tr>
-          <tr><td>5</td><td class="win">0.819</td><td>0.493</td><td class="win">2.22</td></tr>
-          <tr><td>7</td><td class="win">0.743</td><td>0.495</td><td>1.92</td></tr>
+        <div class="formula coral" style="font-size:17px;">F = (1 + ⟨XX⟩<sub>c</sub> + ⟨YY⟩<sub>c</sub> + ⟨ZZ⟩<sub>c</sub>) / 4</div>
+        <table style="margin-top:10px;font-size:14px;">
+          <tr><th>L</th><th>F (with)</th><th>F (no-CZ)</th><th>|S| (with)</th><th>|S| (no-CZ)</th></tr>
+          <tr><td>3</td><td class="win">0.895</td><td>0.494</td><td class="win">2.50</td><td>1.38</td></tr>
+          <tr><td>5</td><td class="win">0.819</td><td>0.493</td><td class="win">2.22</td><td>1.41</td></tr>
+          <tr><td>7</td><td class="win">0.743</td><td>0.495</td><td>1.92</td><td>1.33</td></tr>
         </table>
-        <p style="margin-top:10px;font-size:15px;">Bell entanglement at every L; CHSH violates classical bound at L=3, 5.</p>
+        <div class="figure" style="margin-top:8px;"><img src="assets/results/routed_bell_correction_benefit.png" alt="byproduct correction benefit" style="max-height:180px;width:auto;margin:0 auto;"></div>
+        <p class="fig-cap">Without per-shot byproduct correction, F drops to ≈ 0.25 — undetectable.</p>
       </div>
       <div class="col wide">
         <div class="mbqc-stage">
