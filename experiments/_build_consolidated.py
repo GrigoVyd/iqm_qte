@@ -86,10 +86,24 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, str(Path.cwd().parent))
+# Locate the project root (the directory that contains src/) by walking
+# upward from cwd. This makes the notebook portable: it works whether you
+# launch from experiments/, the repo root, or somewhere else entirely.
+def _find_project_root(start: Path) -> Path | None:
+    for p in [start, *start.parents]:
+        if (p / "src" / "backend.py").exists():
+            return p
+    return None
+_root = _find_project_root(Path.cwd())
+if _root is not None:
+    sys.path.insert(0, str(_root))
+else:
+    sys.path.insert(0, str(Path.cwd().parent))   # fallback: legacy behaviour
 
-# token loading: env var first, then .secrets/iqm_api_key
-if not os.environ.get("IQM_TOKEN"):
+# Token loading: env var first, then .secrets/iqm_api_key (unless
+# QTE_OFFLINE=1 is set, in which case we deliberately stay on the Aer
+# shim — useful for testing the offline reproduce path).
+if not os.environ.get("IQM_TOKEN") and not os.environ.get("QTE_OFFLINE"):
     for p in [Path.cwd() / ".secrets" / "iqm_api_key",
               Path.cwd().parent / ".secrets" / "iqm_api_key"]:
         if p.exists():
@@ -209,36 +223,59 @@ Implementation: `src/routing/beam_chain.py`. Beam width 100 in the head-to-head
 below, 2000 for the full sweep on the larger Emerald."""))
 
 cells.append(code("""# At n=15 on Garnet: build W-state, run both routers, report depth + SWAPs.
+# Needs a real IQM backend (CalibrationDataManager only works on hardware).
+# When running offline (Aer fallback), we just reuse the layouts saved in
+# routing_n15_garnet.json so downstream cells still produce their plots.
 N_RC = 15
 qc_w = build_w_state(N_RC); qc_w.measure_all()
 
-# A) Beam-search chain (multiplicative log-fidelity score)
-from iqm.qubit_selector.qubit_selector import (
-    CalibrationDataManager, CostEvaluator, CostFunction, ReadoutMode)
 backend = backend_garnet
-cal = CalibrationDataManager().get_calibration_fidelities(backend)
-ri = calibration_to_routing_inputs(backend, cal)
-t1_fn, t2_fn = make_decoherence_fns(ri["t1_us"], ri["t2_us"])
-adj = adjacency_from_backend(backend)
-gate_ns = mean_cz_duration_ns(backend)
+ROUTING_FILE = OUT / "routing_n15_garnet.json"
 
-beam_path, beam_score = beam_search_chain(
-    N_RC, adj, ri["cz_fid"], ri["ro_fid"], t1_fn, t2_fn,
-    gate_ns=gate_ns, beam_width=2000,
-)
-qc_beam = transpile(qc_w, backend=backend, initial_layout=beam_path,
-                     optimization_level=3)
+if is_simulator(backend):
+    print("[offline] backend is the Aer fallback — skipping live calibration "
+          "and reusing saved layouts.")
+    if ROUTING_FILE.exists():
+        _saved = json.loads(ROUTING_FILE.read_text())
+        sel_layout  = _saved["selector"]["layout"]
+        beam_path   = _saved["beam"]["layout"]
+        beam_score  = float("nan")
+    else:
+        # Last-resort default so cells below still work
+        sel_layout = list(range(N_RC))
+        beam_path  = list(range(N_RC))
+        beam_score = float("nan")
+    qc_beam = transpile(qc_w, backend=backend, initial_layout=beam_path,
+                         optimization_level=3)
+    qc_sel  = transpile(qc_w, backend=backend, initial_layout=sel_layout,
+                         optimization_level=3)
+else:
+    # A) Beam-search chain (multiplicative log-fidelity score)
+    from iqm.qubit_selector.qubit_selector import (
+        CalibrationDataManager, CostEvaluator, CostFunction, ReadoutMode)
+    cal = CalibrationDataManager().get_calibration_fidelities(backend)
+    ri = calibration_to_routing_inputs(backend, cal)
+    t1_fn, t2_fn = make_decoherence_fns(ri["t1_us"], ri["t2_us"])
+    adj = adjacency_from_backend(backend)
+    gate_ns = mean_cz_duration_ns(backend)
 
-# B) IQM Qubit Selector
-evaluator = CostEvaluator(
-    backend=backend, quantum_circuit=qc_w,
-    cost_function=CostFunction.GATE_COST_CZ,
-    readoutmode=ReadoutMode.FIDELITY, num_trials=500,
-)
-sel_layouts, sel_costs = evaluator.get_top_layouts(num_layouts=1)
-sel_layout = list(sel_layouts[0])
-qc_sel = transpile(qc_w, backend=backend, initial_layout=sel_layout,
-                    optimization_level=3)
+    beam_path, beam_score = beam_search_chain(
+        N_RC, adj, ri["cz_fid"], ri["ro_fid"], t1_fn, t2_fn,
+        gate_ns=gate_ns, beam_width=2000,
+    )
+    qc_beam = transpile(qc_w, backend=backend, initial_layout=beam_path,
+                         optimization_level=3)
+
+    # B) IQM Qubit Selector
+    evaluator = CostEvaluator(
+        backend=backend, quantum_circuit=qc_w,
+        cost_function=CostFunction.GATE_COST_CZ,
+        readoutmode=ReadoutMode.FIDELITY, num_trials=500,
+    )
+    sel_layouts, sel_costs = evaluator.get_top_layouts(num_layouts=1)
+    sel_layout = list(sel_layouts[0])
+    qc_sel = transpile(qc_w, backend=backend, initial_layout=sel_layout,
+                        optimization_level=3)
 
 def n_swaps(qc):
     return sum(1 for g, _, _ in qc.data if g.name == "swap")
@@ -247,14 +284,7 @@ print(f"n=15 W-state on Garnet, after transpile(optimization_level=3):")
 print(f"  IQM Selector  → depth {qc_sel.depth():>4}, SWAPs {n_swaps(qc_sel):>3},"
       f"  layout {sel_layout}")
 print(f"  Beam-search   → depth {qc_beam.depth():>4}, SWAPs {n_swaps(qc_beam):>3},"
-      f"  layout {beam_path}")
-routing_n15 = {
-    "n": N_RC,
-    "selector_layout": sel_layout, "selector_depth": qc_beam.depth(),
-    "beam_layout": beam_path, "beam_depth": qc_beam.depth(),
-    "selector_swaps": n_swaps(qc_sel), "beam_swaps": n_swaps(qc_beam),
-    "beam_score": beam_score, "selector_cost": float(sel_costs[0]),
-}"""))
+      f"  layout {beam_path}")"""))
 
 cells.append(md("""Now we compare the two layouts on hardware. One job per device with the four
 circuits (Selector Z, Selector X, Beam Z, Beam X) batched together — drift-fair
@@ -340,24 +370,44 @@ sweep at $n=19$. (For graph states in §2 we use a spanning tree, which has
 $n-1$ edges and exists for any connected subset of size $n$, so the 20-qubit
 graph-state result remains feasible.)"""))
 
-cells.append(code("""# Per-(device, n) chain selection.
+cells.append(code("""# Per-(device, n) chain selection. On the Aer fallback we instead reuse the
+# chains from the saved w_results.json so downstream plots and the §1.3
+# hardware run still find a layout for each (device, n).
 chains = {}    # {(device_name, n): {layout, score, ...}}
-for dev_name, backend in DEVICES.items():
-    cal = CalibrationDataManager().get_calibration_fidelities(backend)
-    ri = calibration_to_routing_inputs(backend, cal)
-    t1_fn, t2_fn = make_decoherence_fns(ri["t1_us"], ri["t2_us"])
-    adj = adjacency_from_backend(backend)
-    gate_ns = mean_cz_duration_ns(backend)
-    print(f"\\n{dev_name}:")
-    for n in W_NS:
-        path, score = beam_search_chain(
-            n, adj, ri["cz_fid"], ri["ro_fid"], t1_fn, t2_fn,
-            gate_ns=gate_ns, beam_width=2000,
-        )
-        names = [backend.index_to_qubit_name(q) for q in path]
-        chains[(dev_name, n)] = {"layout": path, "names": names,
-                                  "score": score, "device": dev_name, "n": n}
-        print(f"  n={n:>2}: score={score:.3e}  chain={names}")"""))
+_W_FILE_LOCAL = OUT / "w_results.json"
+
+if all(is_simulator(b) for b in DEVICES.values()):
+    if _W_FILE_LOCAL.exists():
+        print("[offline] reusing chains from", _W_FILE_LOCAL)
+        _saved = json.loads(_W_FILE_LOCAL.read_text())
+        for dev_name in DEVICES:
+            saved_chains = _saved.get(dev_name, {}).get("chains", {})
+            for n in W_NS:
+                info = saved_chains.get(str(n))
+                if info is None:
+                    continue
+                chains[(dev_name, n)] = {**info, "device": dev_name, "n": n}
+                print(f"  {dev_name} n={n}: {info['names']}")
+    else:
+        print("[offline] no saved w_results.json — chains{} will be empty.")
+else:
+    from iqm.qubit_selector.qubit_selector import CalibrationDataManager
+    for dev_name, backend in DEVICES.items():
+        cal = CalibrationDataManager().get_calibration_fidelities(backend)
+        ri = calibration_to_routing_inputs(backend, cal)
+        t1_fn, t2_fn = make_decoherence_fns(ri["t1_us"], ri["t2_us"])
+        adj = adjacency_from_backend(backend)
+        gate_ns = mean_cz_duration_ns(backend)
+        print(f"\\n{dev_name}:")
+        for n in W_NS:
+            path, score = beam_search_chain(
+                n, adj, ri["cz_fid"], ri["ro_fid"], t1_fn, t2_fn,
+                gate_ns=gate_ns, beam_width=2000,
+            )
+            names = [backend.index_to_qubit_name(q) for q in path]
+            chains[(dev_name, n)] = {"layout": path, "names": names,
+                                      "score": score, "device": dev_name, "n": n}
+            print(f"  n={n:>2}: score={score:.3e}  chain={names}")"""))
 
 cells.append(md("""**Visualise the selection on the chip.** Below we draw each device's
 coupling graph (using the exact dashboard layout from the IQM docs), shade
@@ -365,13 +415,17 @@ each qubit by its readout fidelity, and overlay the selected chain in red.
 Source: `src/visualization.py:plot_device_topology`."""))
 
 cells.append(code("""for dev_name, backend in DEVICES.items():
+    if is_simulator(backend) or not any((dev_name, n) in chains for n in W_NS):
+        print(f"[offline] no chains for {dev_name} — skipping topology view.")
+        continue
     pos = _device_layout(backend)
     qm, cz = get_qubit_metrics(backend)
     metrics = {q: {"readout_fidelity": qm.get(q, {}).get("readout_fidelity", float("nan"))}
                for q in range(backend.num_qubits)}
     fig, axes = plt.subplots(1, len(W_NS), figsize=(5*len(W_NS), 5))
     for ax, n in zip(axes, W_NS):
-        info = chains[(dev_name, n)]
+        info = chains.get((dev_name, n))
+        if info is None: continue
         chain = info["layout"]
         edges = [(chain[i], chain[i+1]) for i in range(len(chain)-1)]
         plot_device_topology(backend, metrics=metrics, cz_fidelities=cz,
@@ -974,12 +1028,16 @@ for dev, n in HEAD_NS.items():
     calibration_trees[dev] = cal_t
     empirical_trees[dev] = emp_t
     Fcal = [F.get((min(a,b),max(a,b)), float("nan")) for (a,b) in cal_t["edges"]]
-    Femp = [F[(min(a,b),max(a,b))] for (a,b) in emp_t["edges"]]
+    Femp = [F.get((min(a,b),max(a,b)), float("nan")) for (a,b) in emp_t["edges"]]
+    Fcal_clean = [x for x in Fcal if not np.isnan(x)]
+    Femp_clean = [x for x in Femp if not np.isnan(x)]
     print(f"\\n{dev}, n={n}:")
     print(f"  CAL qubits: {cal_t['qubits']}")
-    print(f"       min F over edges: {min(Fcal):.3f}, mean {np.mean(Fcal):.3f}")
+    if Fcal_clean:
+        print(f"       min F over edges: {min(Fcal_clean):.3f}, mean {np.mean(Fcal_clean):.3f}")
     print(f"  EMP qubits: {emp_t['qubits']}")
-    print(f"       min F over edges: {min(Femp):.3f}, mean {np.mean(Femp):.3f}")"""))
+    if Femp_clean:
+        print(f"       min F over edges: {min(Femp_clean):.3f}, mean {np.mean(Femp_clean):.3f}")"""))
 
 cells.append(code("""HEAD_FILE = OUT / "empirical_vs_calibration.json"
 
