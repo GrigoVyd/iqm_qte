@@ -396,18 +396,25 @@ iqm_hackathon/
 ```bash
 python -m venv .venv
 .venv\Scripts\activate              # Windows
-pip install "iqm-client[qiskit]" iqm-qubit-selector \
+pip install "iqm-client[qiskit]" iqm-qubit-selector qiskit-aer \
             numpy matplotlib scipy jupyter rustworkx networkx
 ```
 
-**Reproduce every plot offline (no hardware, no token)** — open
+**Reproduce every plot offline (no hardware, no IQM token)** — open
 [`experiments/witness_my_entanglement.ipynb`](experiments/witness_my_entanglement.ipynb)
-in JupyterLab and run all. The first cell sets `RERUN_HW = False` by
-default, so every section reads its saved JSON from
+in JupyterLab and run all. The first cell sets `RERUN_HW = False`
+by default, so every section reads its saved JSON from
 `experiments/consolidated_results/` and reproduces the figures
-exactly.
+exactly. With **no token at all**, set `QTE_OFFLINE=1` to skip the
+`.secrets/iqm_api_key` lookup and force the Aer-simulator shim
+(Garnet / Emerald topology preserved):
 
-**Without hardware** (Aer simulator):
+```bash
+QTE_OFFLINE=1 jupyter nbconvert --to notebook --execute \
+    --inplace experiments/witness_my_entanglement.ipynb
+```
+
+**Quick sanity check** (Aer-only smoke test of every src/ helper):
 ```bash
 python test_smoke.py
 ```

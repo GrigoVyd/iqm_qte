@@ -18,12 +18,73 @@ except ImportError:
 RESONANCE_URL = "https://resonance.meetiqm.com"
 
 
+_GARNET_EDGES = [
+    (0,1),(0,3),(1,4),(2,3),(2,7),(3,4),(3,8),(4,5),(4,9),
+    (5,6),(5,10),(6,11),(7,8),(7,12),(8,9),(8,13),(9,10),(9,14),
+    (10,11),(10,15),(11,16),(12,13),(13,14),(13,17),(14,15),(14,18),
+    (15,16),(15,19),(16,19),(17,18),(18,19),
+]
+# Emerald (Aphrodite) — 81 native CZ pairs, extracted from a hardware run
+# (experiments/consolidated_results/edge_maps.json::emerald).
+_EMERALD_EDGES = [
+    (0,1),(0,4),(1,5),(2,3),(2,8),(3,4),(3,9),(4,5),(4,10),(5,6),(5,11),
+    (6,12),(7,8),(7,15),(8,9),(8,16),(9,10),(9,17),(10,11),(10,18),
+    (11,12),(11,19),(12,13),(12,20),(13,21),(14,15),(14,22),(15,16),
+    (15,23),(16,17),(16,24),(17,18),(17,25),(18,19),(18,26),(19,20),
+    (20,21),(20,28),(21,29),(22,23),(23,24),(24,25),(24,32),(25,26),
+    (25,33),(26,34),(28,29),(28,36),(29,30),(29,37),(30,38),(31,32),
+    (31,39),(32,33),(32,40),(33,34),(33,41),(34,35),(34,42),(35,36),
+    (35,43),(36,37),(36,44),(37,38),(39,40),(40,41),(40,46),(41,42),
+    (41,47),(42,43),(42,48),(43,44),(43,49),(44,50),(46,47),(47,48),
+    (47,51),(48,52),(49,50),(51,52),(52,53),
+]
+
+
+def _make_device_shim(num_qubits: int, edges: list[tuple[int, int]],
+                       device_label: str):
+    """Construct a Qiskit GenericBackendV2 with the given topology, then
+    monkey-patch a noiseless `.run` that delegates to AerSimulator and a
+    pair of qubit-name helpers. The result behaves like a real BackendV2
+    everywhere transpile / visualizer / routing helpers care about, but
+    actually executes circuits on Aer.
+
+    Used as the offline / no-token fallback so cells that need topology
+    (chip plots, beam-search, edge-Bell map) Just Work.
+    """
+    from qiskit.providers.fake_provider import GenericBackendV2
+
+    backend = GenericBackendV2(
+        num_qubits=num_qubits,
+        coupling_map=[list(e) for e in edges],
+        basis_gates=["cz", "rx", "ry", "rz", "sx", "x", "h", "cx", "id"],
+        seed=0,
+    )
+    backend.device_label = device_label
+
+    aer = AerSimulator()
+    _orig_run = backend.run
+    def _run_via_aer(circuits, *args, **kwargs):
+        return aer.run(circuits, *args, **kwargs)
+    backend.run = _run_via_aer
+    backend.index_to_qubit_name = lambda q: f"QB{q + 1}"
+    backend.qubit_name_to_index = lambda name: int(name[2:]) - 1
+    return backend
+
+
+class _DeviceShim:
+    """Marker only — actual shim is a GenericBackendV2 produced by
+    `_make_device_shim`. We keep this class so isinstance() checks on old
+    code paths don't break, but it's not directly instantiated."""
+
+
 def get_backend(token: str | None = None, device: str = "emerald"):
     """Connect to IQM Resonance and return a Qiskit backend.
 
-    If `token` is None and IQM_TOKEN env var is unset, falls back to AerSimulator.
-    The IQM client errors if both env var and arg are set, so we pass arg only
-    when the env var is absent.
+    If `token` is None and IQM_TOKEN env var is unset, falls back to a
+    `_DeviceShim` wrapping AerSimulator with the requested device's
+    topology (num_qubits + coupling_map). This way every downstream cell
+    that needs the chip shape (visualizer, beam-search, edge-Bell map)
+    works offline without any IQM credentials.
     """
     env_token = os.environ.get("IQM_TOKEN")
     effective = token or env_token
@@ -33,12 +94,21 @@ def get_backend(token: str | None = None, device: str = "emerald"):
         else:
             provider = IQMProvider(RESONANCE_URL, quantum_computer=device, token=token)
         return provider.get_backend()
-    print("No IQM token — using Aer simulator.")
+    if device == "garnet":
+        print("No IQM token — using Aer shim with Garnet topology (20 q).")
+        return _make_device_shim(20, _GARNET_EDGES, "garnet")
+    if device == "emerald":
+        print("No IQM token — using Aer shim with Emerald topology (54 q).")
+        return _make_device_shim(54, _EMERALD_EDGES, "emerald")
+    print("No IQM token — using bare Aer simulator.")
     return AerSimulator()
 
 
 def is_simulator(backend) -> bool:
-    return isinstance(backend, AerSimulator)
+    if isinstance(backend, AerSimulator):
+        return True
+    # GenericBackendV2-based shim is tagged with .device_label
+    return getattr(backend, "device_label", None) in {"garnet", "emerald"}
 
 
 def get_qubit_metrics(backend) -> tuple[dict[int, dict], dict[tuple[int, int], float]]:
