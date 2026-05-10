@@ -2,7 +2,7 @@
 venv/
 env/
 ENV/
-.venv
+.venv/
 
 # Python
 __pycache__/
@@ -27,7 +27,7 @@ wheels/
 *.egg
 
 # Jupyter Notebook
-.ipynb_checkpoints
+.ipynb_checkpoints/
 *.ipynb_checkpoints
 
 # IDEs
@@ -37,14 +37,15 @@ wheels/
 *.swo
 *~
 .DS_Store
+.claude/
 
 # Environment variables
 .env
 .env.local
+.secrets/
 
 # OS
 Thumbs.db
-.DS_Store
 
 # Test coverage
 .coverage
@@ -52,3 +53,6 @@ htmlcov/
 
 # Miscellaneous
 .pytest_cache/
+*.png
+hw_run*.log
+ETHQHack2026-main/

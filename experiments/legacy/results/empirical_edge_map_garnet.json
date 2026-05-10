@@ -1,0 +1,482 @@
+[
+  {
+    "edge": [
+      0,
+      1
+    ],
+    "matching_id": 0,
+    "shots": 4000,
+    "e_XZ": 0.953,
+    "e_ZX": 0.943,
+    "e_YY": 0.929,
+    "F": 0.95625,
+    "sigma_F": 0.0023031941136170005,
+    "z_score": 198.09446251297172,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      2,
+      3
+    ],
+    "matching_id": 0,
+    "shots": 4000,
+    "e_XZ": 0.87,
+    "e_ZX": 0.8785,
+    "e_YY": 0.8685,
+    "F": 0.90425,
+    "sigma_F": 0.00334721315985403,
+    "z_score": 120.77211121434199,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      4,
+      5
+    ],
+    "matching_id": 0,
+    "shots": 4000,
+    "e_XZ": 0.934,
+    "e_ZX": 0.9325,
+    "e_YY": 0.922,
+    "F": 0.9471250000000001,
+    "sigma_F": 0.002524887837855376,
+    "z_score": 177.08707424397326,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      6,
+      11
+    ],
+    "matching_id": 0,
+    "shots": 4000,
+    "e_XZ": 0.7725,
+    "e_ZX": 0.77,
+    "e_YY": 0.757,
+    "F": 0.824875,
+    "sigma_F": 0.004396900097654028,
+    "z_score": 73.88728258195758,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      7,
+      8
+    ],
+    "matching_id": 0,
+    "shots": 4000,
+    "e_XZ": 0.946,
+    "e_ZX": 0.9515,
+    "e_YY": 0.9325,
+    "F": 0.9575,
+    "sigma_F": 0.002271341495130136,
+    "z_score": 201.42281597941204,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      9,
+      10
+    ],
+    "matching_id": 0,
+    "shots": 4000,
+    "e_XZ": 0.9335,
+    "e_ZX": 0.9365,
+    "e_YY": 0.903,
+    "F": 0.94325,
+    "sigma_F": 0.002610485168029116,
+    "z_score": 169.79602314103485,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      12,
+      13
+    ],
+    "matching_id": 0,
+    "shots": 4000,
+    "e_XZ": 0.949,
+    "e_ZX": 0.95,
+    "e_YY": 0.919,
+    "F": 0.9545,
+    "sigma_F": 0.0023463335760287797,
+    "z_score": 193.70647236325667,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      14,
+      15
+    ],
+    "matching_id": 0,
+    "shots": 4000,
+    "e_XZ": 0.928,
+    "e_ZX": 0.9205,
+    "e_YY": 0.9065,
+    "F": 0.93875,
+    "sigma_F": 0.0027092246930625744,
+    "z_score": 161.94670051675416,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      17,
+      18
+    ],
+    "matching_id": 0,
+    "shots": 4000,
+    "e_XZ": 0.9115,
+    "e_ZX": 0.906,
+    "e_YY": 0.8885,
+    "F": 0.9265,
+    "sigma_F": 0.0029551319238741275,
+    "z_score": 144.3251979901005,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      0,
+      3
+    ],
+    "matching_id": 1,
+    "shots": 4000,
+    "e_XZ": 0.8935,
+    "e_ZX": 0.8865,
+    "e_YY": 0.889,
+    "F": 0.9172499999999999,
+    "sigma_F": 0.0031261360435048255,
+    "z_score": 133.47147858997386,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      1,
+      4
+    ],
+    "matching_id": 1,
+    "shots": 4000,
+    "e_XZ": 0.9395,
+    "e_ZX": 0.9505,
+    "e_YY": 0.9245,
+    "F": 0.9536250000000001,
+    "sigma_F": 0.0023690360974983056,
+    "z_score": 191.480830739146,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      2,
+      7
+    ],
+    "matching_id": 1,
+    "shots": 4000,
+    "e_XZ": 0.9375,
+    "e_ZX": 0.927,
+    "e_YY": 0.9195,
+    "F": 0.946,
+    "sigma_F": 0.0025503814052999993,
+    "z_score": 174.87580448679492,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      5,
+      6
+    ],
+    "matching_id": 1,
+    "shots": 4000,
+    "e_XZ": 0.9215,
+    "e_ZX": 0.9295,
+    "e_YY": 0.9135,
+    "F": 0.941125,
+    "sigma_F": 0.0026586687516969845,
+    "z_score": 165.91950378114504,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      8,
+      9
+    ],
+    "matching_id": 1,
+    "shots": 4000,
+    "e_XZ": 0.9395,
+    "e_ZX": 0.9375,
+    "e_YY": 0.9215,
+    "F": 0.9496249999999999,
+    "sigma_F": 0.0024662447731824996,
+    "z_score": 182.31158759630878,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      10,
+      11
+    ],
+    "matching_id": 1,
+    "shots": 4000,
+    "e_XZ": 0.782,
+    "e_ZX": 0.784,
+    "e_YY": 0.756,
+    "F": 0.8305,
+    "sigma_F": 0.004334245897500509,
+    "z_score": 76.25317248165226,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      13,
+      14
+    ],
+    "matching_id": 1,
+    "shots": 4000,
+    "e_XZ": 0.9365,
+    "e_ZX": 0.951,
+    "e_YY": 0.905,
+    "F": 0.9481250000000001,
+    "sigma_F": 0.0024985675583721967,
+    "z_score": 179.3527649466285,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      15,
+      16
+    ],
+    "matching_id": 1,
+    "shots": 4000,
+    "e_XZ": 0.9295,
+    "e_ZX": 0.936,
+    "e_YY": 0.92,
+    "F": 0.946375,
+    "sigma_F": 0.0025419411566261715,
+    "z_score": 175.6039862828523,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      18,
+      19
+    ],
+    "matching_id": 1,
+    "shots": 4000,
+    "e_XZ": 0.9255,
+    "e_ZX": 0.9335,
+    "e_YY": 0.9,
+    "F": 0.93975,
+    "sigma_F": 0.0026868531198225186,
+    "z_score": 163.66730163093095,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      3,
+      4
+    ],
+    "matching_id": 2,
+    "shots": 4000,
+    "e_XZ": 0.885,
+    "e_ZX": 0.8915,
+    "e_YY": 0.8845,
+    "F": 0.91525,
+    "sigma_F": 0.0031614437465341686,
+    "z_score": 131.34821723626453,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      5,
+      10
+    ],
+    "matching_id": 2,
+    "shots": 4000,
+    "e_XZ": 0.938,
+    "e_ZX": 0.9305,
+    "e_YY": 0.9095,
+    "F": 0.9445,
+    "sigma_F": 0.0025834070890008807,
+    "z_score": 172.0596037273816,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      7,
+      12
+    ],
+    "matching_id": 2,
+    "shots": 4000,
+    "e_XZ": 0.958,
+    "e_ZX": 0.9415,
+    "e_YY": 0.927,
+    "F": 0.956625,
+    "sigma_F": 0.0022929400818054537,
+    "z_score": 199.1438867606409,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      8,
+      13
+    ],
+    "matching_id": 2,
+    "shots": 4000,
+    "e_XZ": 0.939,
+    "e_ZX": 0.9375,
+    "e_YY": 0.918,
+    "F": 0.948625,
+    "sigma_F": 0.00248950531607185,
+    "z_score": 180.2064840367074,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      9,
+      14
+    ],
+    "matching_id": 2,
+    "shots": 4000,
+    "e_XZ": 0.938,
+    "e_ZX": 0.9505,
+    "e_YY": 0.911,
+    "F": 0.949875,
+    "sigma_F": 0.002458355490719355,
+    "z_score": 182.9983506040289,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      11,
+      16
+    ],
+    "matching_id": 2,
+    "shots": 4000,
+    "e_XZ": 0.8145,
+    "e_ZX": 0.791,
+    "e_YY": 0.781,
+    "F": 0.8466250000000001,
+    "sigma_F": 0.004147566587018224,
+    "z_score": 83.57310069112027,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      15,
+      19
+    ],
+    "matching_id": 2,
+    "shots": 4000,
+    "e_XZ": 0.944,
+    "e_ZX": 0.936,
+    "e_YY": 0.931,
+    "F": 0.95275,
+    "sigma_F": 0.0023914136770956207,
+    "z_score": 189.32316241908688,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      3,
+      8
+    ],
+    "matching_id": 3,
+    "shots": 4000,
+    "e_XZ": 0.8965,
+    "e_ZX": 0.9055,
+    "e_YY": 0.8935,
+    "F": 0.923875,
+    "sigma_F": 0.0030052434645549105,
+    "z_score": 141.04514492731047,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      4,
+      9
+    ],
+    "matching_id": 3,
+    "shots": 4000,
+    "e_XZ": 0.9415,
+    "e_ZX": 0.937,
+    "e_YY": 0.918,
+    "F": 0.949125,
+    "sigma_F": 0.002477665073965809,
+    "z_score": 181.26945595641783,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      10,
+      15
+    ],
+    "matching_id": 3,
+    "shots": 4000,
+    "e_XZ": 0.932,
+    "e_ZX": 0.9365,
+    "e_YY": 0.9155,
+    "F": 0.946,
+    "sigma_F": 0.0025501332685763695,
+    "z_score": 174.89282050305658,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      13,
+      17
+    ],
+    "matching_id": 3,
+    "shots": 4000,
+    "e_XZ": 0.9315,
+    "e_ZX": 0.9465,
+    "e_YY": 0.9155,
+    "F": 0.948375,
+    "sigma_F": 0.002494698284612791,
+    "z_score": 179.73115336854994,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  },
+  {
+    "edge": [
+      14,
+      18
+    ],
+    "matching_id": 3,
+    "shots": 4000,
+    "e_XZ": 0.9155,
+    "e_ZX": 0.8995,
+    "e_YY": 0.9055,
+    "F": 0.930125,
+    "sigma_F": 0.002885386807908084,
+    "z_score": 149.0701346596376,
+    "entangled_3sigma": true,
+    "entangled_meanonly": true
+  }
+]
