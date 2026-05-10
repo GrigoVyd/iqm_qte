@@ -1448,6 +1448,103 @@ cells.append(code("""if routed_data:
 
 cells.append(md("""---
 
+# §1.4 — Tuning the routing loss function (gri)
+
+The beam-search router in §1.1 scores chains by
+
+$$\\mathcal{L}(\\text{path}) = w_{CZ}\\!\\sum \\log F_{CZ} + w_{RO}\\!\\sum \\log F_{RO}
+ + w_{T_1}\\!\\sum \\log P_{T_1}(\\Delta t) + w_{T_2}\\!\\sum \\log P_{T_2}(\\Delta t),$$
+
+with weights $(w_{CZ}, w_{RO}, w_{T_1}, w_{T_2})$. **What's the right weighting?**
+Equal weights $(1, 1, 1, 1)$ is just a guess — the true relative cost of a
+CZ-infidelity vs a unit of $T_1$ decay vs a 1 % readout error depends on
+the device's noise profile and the circuit's specific exposure to each.
+
+### Method
+
+On Emerald target $n = 30$ W-state, we ran a Nelder–Mead-style search over
+weight vectors. **For each weight sample** the router picks a chain and
+that chain is executed on hardware — Z-basis fidelity to $|W_n\\rangle$
+becomes the optimisation objective. After ~1000 weight samples and 71
+unique chains visited, the search converges on:"""))
+
+cells.append(code("""# Load gri's optimisation results and pretty-print the headline numbers.
+import json
+opt = json.load(open("consolidated_results/routing_opt/results_n30.json"))
+W = opt["optimal_weights"]
+m = opt["metadata"]
+print(f"Search budget: {m['n_weight_samples']} weight samples, "
+      f"{m['n_unique_chains']} unique chains evaluated on hardware.")
+print(f"Target: n = {m['target_n']} W-state on {m['backend']}, "
+      f"{m['eval_shots']} shots per evaluation.")
+print()
+print(f"{'weight':<8}{'value':>10}{'baseline':>12}{'ratio':>10}")
+for k in ("cz", "ro", "t1", "t2"):
+    print(f"  w_{k:<5}{W[k]:>10.3f}{1.0:>12.3f}{W[k]:>10.2f}×")
+print()
+oc = opt["optimal_chain"]
+bc = opt["baseline_chain"]
+print(f"At n=30 on Emerald, hardware Z-basis fidelity to |W_30⟩:")
+print(f"  baseline (1,1,1,1):     F_z = {bc['fidelity_z']:.3f}")
+print(f"  tuned weights:          F_z = {oc['fidelity_z']:.3f}   "
+      f"({oc['fidelity_z']/bc['fidelity_z']:.1f}× better)")
+print(f"  X-witness ⟨W_x⟩:        {oc['witness_x']:.3f}  "
+      f"(ideal 2/n = {2/m['target_n']:.3f}; classical = 0)")"""))
+
+cells.append(md("""**Interpretation.** The CZ weight ends up the largest by a wide margin —
+three to four times the decoherence weights — confirming that CZ infidelity
+is the dominant error channel for chain circuits on Emerald. Readout
+fidelity matters less than naïve weighting suggests because each shot reads
+out only at the end (one sample per qubit), while CZ errors compound across
+$n-1$ adjacent gates. $T_2$ has the smallest weight: dephasing is a
+relatively slow process compared to a $\\sim L \\cdot 100$ ns chain
+duration, while the X-basis measurement scrambles its sensitivity."""))
+
+cells.append(md("""### Cross-validation across $n$
+
+We then took the *same* tuned weights and ran the router for
+$n \\in \\{20, 22, 24, 26, 28, 30\\}$ — does the optimisation overfit to
+$n = 30$, or do the weights generalise?"""))
+
+cells.append(code("""# Cross-validation: do the n=30-tuned weights work at other n?
+xv = opt["cross_validation"]
+print(f"{'n':>3}{'F_z (tuned)':>14}{'⟨W_x⟩ (tuned)':>16}{'ideal 2/n':>12}{'F_z (baseline)':>17}")
+for n_str, row in sorted(xv.items(), key=lambda kv: int(kv[0])):
+    fz   = row["fidelity_z_optimal"]
+    wx   = row["witness_x_optimal"]
+    base = row["fidelity_z_baseline"]
+    base_str = f"{base:.3f}" if base is not None else "n/a"
+    print(f"{n_str:>3}{fz:>14.3f}{wx:>16.3f}{row['ideal_witness_x']:>12.3f}"
+          f"{base_str:>17}")
+print()
+best = opt["best_n_above_threshold"]
+print(f"Best n at fidelity threshold 0.5: n = {best['n']}, "
+      f"F_z = {best['fidelity_z']:.3f}, ⟨W_x⟩ = {best['witness_x']:.3f}.")"""))
+
+cells.append(code("""# Summary plot: side-by-side cross-validation + weight-landscape from gri.
+from IPython.display import Image, display
+import os
+ROOT = "consolidated_results/routing_opt"
+for f, cap in (("cross_validation.png",
+                 "Cross-validation: tuned weights run at n=20..30, baseline at n=30."),
+                ("nm_trace.png",
+                 "Nelder-Mead trajectory through weight space — fidelity_z over iterations."),
+                ("candidate_fidelities.png",
+                 "Per-candidate hardware fidelity over the search.")):
+    path = os.path.join(ROOT, f)
+    if os.path.exists(path):
+        display(Image(filename=path, width=820))
+        print(cap, "\\n")"""))
+
+cells.append(md("""**Takeaway.** A small, principled refinement of the routing loss function
+(four scalar weights, ~1000 hardware shots to learn) **doubles** the
+n = 30 W-state fidelity on Emerald and generalises across the whole
+$n = 20\\!-\\!30$ sweep. It costs a modest one-off calibration on the
+device and pays off every subsequent run. (Implementation: gri's branch,
+notebook `routing_coefficient_optimization.ipynb`.)
+
+---
+
 # Summary
 
 ### What we proved
