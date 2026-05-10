@@ -16,9 +16,9 @@ The submission is a single self-contained notebook:
 > to `True` to re-collect data on hardware (~12 batched jobs).
 
 There is also a **scrolling presentation site** at
-[`presentation/index.html`](presentation/index.html) — open in any
-browser, walk through with the arrow keys, press `F` for fullscreen,
-click any plot to zoom.
+[`presentation/index.html`](presentation/index.html), published on GitHub Pages at
+<https://grigovyd.github.io/iqm_qte/> — use arrow keys to navigate,
+press `F` for fullscreen, and click any plot to zoom.
 
 ## Headline results
 
