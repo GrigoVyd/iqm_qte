@@ -12,8 +12,9 @@ The corrected stabilizer expectation is:
     ⟨g_i⟩_mitigated = ⟨g_i⟩_raw × ∏_{j ∈ {i} ∪ N(i)} c_j
 
 References:
-- Bravyi, Sheldon et al., "Mitigating measurement errors in multiqubit experiments",
-  Phys. Rev. A 103, 042605 (2021).
+- S. Bravyi, S. Sheldon, A. Kandala, D. C. McKay, J. M. Gambetta,
+  "Mitigating Measurement Errors in Multiqubit Experiments",
+  Phys. Rev. A 103, 042605 (2021). arXiv:2006.14044
 
 Calibration data: pulled from the IQM device's quality metric set
 (error_0_to_1, error_1_to_0 per qubit) — no extra calibration circuits needed.
