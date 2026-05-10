@@ -1,10 +1,23 @@
-// app.js — animations, dot nav, keyboard, fullscreen.
+// app.js — animations, dot nav, keyboard, fullscreen, stage scaling.
 
 (function () {
   const deck = document.getElementById("deck");
   const sections = Array.from(deck.querySelectorAll("section.panel"));
   const dotsHost = document.getElementById("dots");
   const fsBtn = document.getElementById("fs");
+
+  // ---------- Fixed-stage scale-to-fit ----------
+  // The .stage element is 1600x900 logical px. We scale it to fit the
+  // current viewport while preserving aspect ratio (letter-box around it).
+  const STAGE_W = 1600, STAGE_H = 900;
+  function setStageScale() {
+    const sx = window.innerWidth / STAGE_W;
+    const sy = window.innerHeight / STAGE_H;
+    const s = Math.min(sx, sy);
+    document.documentElement.style.setProperty("--stage-scale", String(s));
+  }
+  setStageScale();
+  window.addEventListener("resize", setStageScale);
 
   // ---------- dots ----------
   sections.forEach((sec, i) => {
