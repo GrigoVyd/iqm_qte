@@ -1,10 +1,28 @@
 # Witness My Entanglement — ETH Quantum Hackathon 2026
 
-**IQM Challenge: Prove quantum entanglement on IQM hardware in the most compelling, scalable, and flexible way possible.**
+**Q.te team · IQM Challenge** — prove quantum entanglement on IQM hardware (Emerald 54 q + Garnet 20 q) in the most compelling, scalable, and flexible way possible.
+
+## ⭐ Start here
+
+The submission is a single self-contained notebook:
+
+> **[experiments/witness_my_entanglement.ipynb](experiments/witness_my_entanglement.ipynb)**
+>
+> Three threads — W states, graph-state GME, routed Bell pair — plus
+> a routing-coefficient outlook (gri's branch). Every figure and table
+> in this README is produced from this notebook. A single
+> `RERUN_HW = False` flag at the top reproduces every plot offline
+> from the saved JSONs in `experiments/consolidated_results/`; flip
+> to `True` to re-collect data on hardware (~12 batched jobs).
+
+There is also a **scrolling presentation site** at
+[`presentation/index.html`](presentation/index.html) — open in any
+browser, walk through with the arrow keys, press `F` for fullscreen,
+click any plot to zoom.
 
 ## Headline results
 
-We deploy **two qualitatively distinct entanglement witnesses on three different families of multipartite states**, all on real IQM hardware, and reach **GME on 20 qubits with the entire Garnet chip**.
+We deploy **four qualitatively distinct entanglement witnesses on three different families of multipartite states**, all on real IQM hardware, and reach **GME on 20 qubits with the entire Garnet chip**.
 
 ### 1. Graph-state GME witness (main result)
 
@@ -340,38 +358,35 @@ iqm_hackathon/
 ├── test_smoke.py                   ← Aer smoke test
 │
 ├── src/
-│   ├── backend.py                  ← IQM connection, threshold filter,
-│   │                                  cost function, predictor, sub-tree finder
+│   ├── backend.py                  ← IQM connection, threshold filter, MST tree
+│   │                                  selectors (calibration + empirical-F variants)
 │   ├── circuits/
 │   │   ├── cluster_2d.py           ← rectangular 2D cluster state
-│   │   └── graph_state.py          ← arbitrary graph state + 2-coloring
+│   │   ├── graph_state.py          ← arbitrary graph state + 2-coloring
+│   │   └── w_state.py              ← W-state F-gate (Diker) cascade
+│   ├── routing/beam_chain.py       ← beam-search Hamiltonian-path router
 │   ├── witnesses/
-│   │   ├── gme_cluster.py          ← rectangular cluster GME witness
-│   │   └── gme_graph.py            ← MAIN: arbitrary graph GME witness +
-│   │                                  Tóth-Gühne fidelity lower bound
+│   │   ├── gme_graph.py            ← Tóth-Gühne stabilizer-sum witness
+│   │   ├── gme_cluster.py          ← rectangular cluster variant
+│   │   ├── w_witness.py            ← Z-fid + non-linear pairwise X-witness
+│   │   └── routed_bell.py          ← cluster-MBQC routed Bell pair + CHSH
 │   ├── mitigation/
-│   │   ├── parity_qrem.py          ← readout correction
-│   │   └── zne.py                  ← CZ folding + bootstrap extrapolation
+│   │   ├── parity_qrem.py          ← readout correction (no extra cal shots)
+│   │   └── zne.py                  ← CZ folding (with barriers) + bootstrap
+│   ├── diagnostics/edge_bell_map.py ← per-CZ-pair fidelity map ("Anna's" map)
 │   ├── dfe.py                      ← Direct Fidelity Estimation
-│   └── visualization.py            ← exact IQM dashboard layouts (Emerald + Garnet),
-│                                     spotlight + Prim's animation
+│   └── visualization.py            ← exact IQM dashboard layouts + Prim's animation
 │
-└── experiments/
-    ├── witness_my_entanglement.ipynb    ← MAIN: full story end-to-end on both devices
-    │                                       Part 1 (W-states) + Part 2 (graph-state GME +
-    │                                       empirical-F edge map + tree comparison)
-    ├── consolidated_results/            ← JSON + PNG outputs of the consolidated run
-    └── legacy/                          ← per-topic notebooks from the iterative phase
-        ├── 00_gme_walkthrough.ipynb     ←   step-by-step 2×3 cluster intro
-        ├── 01_emerald_showcase.ipynb    ←   per-device Emerald GME run
-        ├── 02_garnet_showcase.ipynb     ←   per-device Garnet GME run
-        ├── 03_ghz_vs_w_comparison.ipynb ←   GHZ vs W fidelity scaling
-        ├── 04_w_state_entanglement.ipynb←   W-state non-linear witness exploration
-        ├── 05_w_state_scaling.ipynb     ←   W-state quality vs n with beam-search routing
-        ├── 06_routing_comparison.ipynb  ←   IQM Selector vs beam-search chain head-to-head
-        ├── 07_empirical_routing.ipynb   ←   first cut at Anna's measured-F tree
-        ├── results/                     ←   saved JSONs from per-topic runs
-        └── figures/                     ←   PNGs from per-topic runs
+├── experiments/
+│   ├── witness_my_entanglement.ipynb    ← ⭐ MAIN: full story end-to-end on both devices
+│   │                                       Part 1 (W-states) + Part 2 (graph GME +
+│   │                                       empirical-F tree) + Part 3 (routed Bell)
+│   │                                       + §1.4 routing-coefficient optimization
+│   ├── consolidated_results/            ← JSON + PNG outputs of the consolidated run
+│   └── legacy/                          ← per-topic notebooks from the iterative phase
+│
+├── presentation/                   ← scroll-snapping deck (open index.html in browser)
+└── qte_brand_kit/                  ← logo, palette, slide title backdrop
 ```
 
 ---
@@ -384,6 +399,13 @@ python -m venv .venv
 pip install "iqm-client[qiskit]" iqm-qubit-selector \
             numpy matplotlib scipy jupyter rustworkx networkx
 ```
+
+**Reproduce every plot offline (no hardware, no token)** — open
+[`experiments/witness_my_entanglement.ipynb`](experiments/witness_my_entanglement.ipynb)
+in JupyterLab and run all. The first cell sets `RERUN_HW = False` by
+default, so every section reads its saved JSON from
+`experiments/consolidated_results/` and reproduces the figures
+exactly.
 
 **Without hardware** (Aer simulator):
 ```bash
