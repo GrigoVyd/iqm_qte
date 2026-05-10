@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Q.te — Witness My Entanglement</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<main id="deck">
+
+  <!-- 1 · Cover -->
+  <section id="s1-cover" class="panel">
+    <div class="cover-content">
+      <h1>Q.te</h1>
+      <div class="cover-tag">ETH QUANTUM HACKATHON · ENTANGLEMENT TRACK · 2026</div>
+      <div class="cover-sub"><span class="cover-typer">Witness my entanglement</span></div>
+    </div>
+  </section>
+
+  <!-- 2 · The challenge -->
+  <section id="s2-challenge" class="panel">
+    <span class="slide-num">02 / 10</span>
+    <span class="tag">The challenge</span>
+    <h2>Prove entanglement on IQM hardware — rigorously, on as many qubits as we can, in as many ways as we can.</h2>
+    <div class="cols">
+      <div class="col">
+        <h3>Three goals</h3>
+        <p class="lead">Theoretical correctness, qubit count, and variety of states. Plus: implementation sophistication — the engineering that turns "we tried" into "it worked".</p>
+      </div>
+      <div class="col">
+        <div class="card-grid">
+          <div class="card"><span class="num">20<small style="font-size:24px;">%</small></span><span class="label">Theory correctness</span></div>
+          <div class="card teal"><span class="num">30<small style="font-size:24px;">%</small></span><span class="label">Implementation</span></div>
+          <div class="card coral"><span class="num">20<small style="font-size:24px;">%</small></span><span class="label">Qubit count</span></div>
+          <div class="card ink"><span class="num">20<small style="font-size:24px;">%</small></span><span class="label">State variety</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 · Story overview -->
+  <section id="s3-story" class="panel">
+    <span class="slide-num">03 / 10</span>
+    <span class="tag">Our submission, in one slide</span>
+    <h2>Three threads, two devices, one notebook.</h2>
+    <div class="cols">
+      <div class="col wide">
+        <div class="story-card"><h3>Part 1 — W-state thread</h3><div class="body">Diker / F-gate prep · beam-search Hamiltonian-path routing · non-linear pairwise-X witness on Emerald + Garnet for n ∈ {5, 10, 15, 19}.</div></div>
+        <div class="story-card teal"><h3>Part 2 — Graph-state thread</h3><div class="body">Spanning-tree Tóth–Gühne stabilizer witness with parity-QREM and ZNE · n ∈ {6, 12, 20} on both chips · empirical-F tree selection (§2.4).</div></div>
+        <div class="story-card coral"><h3>Part 3 — Routed Bell pair</h3><div class="body">Cluster-MBQC entanglement routing · Bell fidelity + CHSH game on Garnet · path lengths L = 3, 5, 7.</div></div>
+      </div>
+      <div class="col" style="text-align:center;">
+        <img src="assets/qte_logo_wordmark_1024.png" style="max-width:65%;margin-top:20px;" class="fade-in">
+        <p class="fig-cap" style="margin-top:30px;">All in one notebook<br><span class="pill">experiments/witness_my_entanglement.ipynb</span><br><span style="display:block;margin-top:8px;">~12 batched hardware jobs · reproducible offline via <span class="pill">RERUN_HW=False</span></span></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · Beam-search vs IQM Selector -->
+  <section id="s4-routing" class="panel">
+    <span class="slide-num">04 / 10</span>
+    <span class="tag">Part 1 · W states</span>
+    <h2>Why we don't trust the IQM Selector for chain circuits.</h2>
+    <div class="cols">
+      <div class="col">
+        <p>The IQM Qubit Selector is a great general-purpose layout tool — it scores arbitrary subgraphs. But for a circuit whose interaction graph is a <em>chain</em>, it can pick a layout that requires SWAPs.</p>
+        <p>Our beam-search Hamiltonian-path router scores chains directly:</p>
+        <div class="formula" style="font-size:18px;">𝓛 = Σ log F<sub>RO</sub> + Σ log F<sub>CZ</sub> + Σ log P<sub>T₁</sub>(Δt) + Σ log P<sub>T₂</sub>(Δt)</div>
+        <p style="margin-top:10px;">Same n=15 W-state, same Garnet job, two layouts:</p>
+        <table>
+          <tr><th></th><th>F<sub>z</sub></th><th>⟨W<sub>x</sub>⟩</th><th>σ above 0</th></tr>
+          <tr><td>IQM Selector</td><td><span class="counter" data-end="0.31" data-decimals="2">0.31</span></td><td>+0.085</td><td>+14σ</td></tr>
+          <tr><td><strong>Beam-search</strong></td><td class="win"><span class="counter" data-end="0.68" data-decimals="2">0.68</span></td><td class="win">+0.114</td><td class="win">+31σ</td></tr>
+        </table>
+        <p style="margin-top:10px;"><em>2× the F<sub>z</sub></em> on the same hardware.</p>
+      </div>
+      <div class="col">
+        <div class="figure"><img src="assets/results/routing_n15_garnet.png" alt="routing comparison"></div>
+        <p class="fig-cap">n=15 W-state on Garnet · Selector vs beam-search</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · W-state sweep -->
+  <section id="s5-w-sweep" class="panel">
+    <span class="slide-num">05 / 10</span>
+    <span class="tag">Part 1 · W states</span>
+    <h2>Non-linear X-witness — non-classical at every n on both devices.</h2>
+    <div class="cols">
+      <div class="col">
+        <p>For the W-state |W<sub>n</sub>⟩ the pairwise X-correlator separates quantum from classical:</p>
+        <div class="formula coral">⟨X<sub>i</sub> X<sub>j</sub>⟩ = 2/n &nbsp;<small>(quantum)</small> &nbsp;·&nbsp; 0 &nbsp;<small>(classical mixture)</small></div>
+        <p style="margin-top:8px;">Conservative σ: sample-std across pairs / √n<sub>pairs</sub> — absorbs inter-pair correlation.</p>
+        <table>
+          <tr><th>n</th><th>Garnet σ</th><th>Emerald σ</th></tr>
+          <tr><td>5</td><td class="win">+60σ</td><td class="win">+44σ</td></tr>
+          <tr><td>10</td><td class="win">+29σ</td><td class="win">+26σ</td></tr>
+          <tr><td>15</td><td class="win">+28σ</td><td class="win">+35σ</td></tr>
+          <tr><td><b>19</b></td><td class="win"><b>+26σ</b></td><td class="win"><b>+31σ</b></td></tr>
+        </table>
+        <p style="margin-top:10px;">n=19 is the longest Hamiltonian path on Garnet. Every (device, n) certifies non-classicality at <em>+25σ to +60σ</em>.</p>
+      </div>
+      <div class="col">
+        <div class="figure"><img src="assets/results/w_sweep_summary.png" alt="W-state sweep"></div>
+        <p class="fig-cap">F<sub>z</sub> and ⟨W<sub>x</sub>⟩ vs n · dashed black: ideal 2/n · red dotted: classical bound 0</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 · GME tree growth animation -->
+  <section id="s6-tree" class="panel">
+    <span class="slide-num">06 / 10</span>
+    <span class="tag teal">Part 2 · Graph states</span>
+    <h2>Tóth–Gühne stabilizer witness on a spanning tree.</h2>
+    <div class="cols">
+      <div class="col tight">
+        <div class="formula teal">g<sub>i</sub> = X<sub>i</sub> ⊗ ⊗<sub>j ∈ N(i)</sub> Z<sub>j</sub></div>
+        <div class="formula" style="margin-top:8px;">W = Σ ⟨g<sub>i</sub>⟩ ≤ n − 1 &nbsp;<small>(biseparable)</small></div>
+        <p style="margin-top:10px;"><em>W &gt; n − 1 ⇒ genuine multipartite entanglement.</em></p>
+        <p>A spanning tree has n−1 edges → minimum CZ count. We pick the highest-fidelity tree by multi-start Prim's MST on live calibration data, with a local edge-swap refinement.</p>
+        <p style="margin-top:6px;">Watch <em>Prim's algorithm</em> grow the n=20 Garnet tree →</p>
+      </div>
+      <div class="col">
+        <div style="display:flex;gap:18px;align-items:flex-start;">
+          <div id="garnet-chip-host" style="flex:1;background:white;border-radius:12px;padding:14px;box-shadow:0 4px 14px rgba(26,26,46,0.08);"></div>
+          <div class="counter-card" style="width:170px;">
+            <div class="smalllbl">Predicted W</div>
+            <div class="big" id="prim-W">0.00</div>
+            <div class="counter-row">
+              <div class="counter-mini"><b id="prim-edges">0</b><span class="lbl">edges</span></div>
+              <div class="counter-mini"><b id="prim-qubits">1</b><span class="lbl">qubits</span></div>
+            </div>
+            <div class="smalllbl" style="margin-top:14px;">Bound</div>
+            <div class="big" style="font-size:34px;color:var(--ink);">19</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 · GME mitigation results -->
+  <section id="s7-mitigation" class="panel">
+    <span class="slide-num">07 / 10</span>
+    <span class="tag teal">Part 2 · Graph states</span>
+    <h2>20-qubit GME on the entire Garnet chip.</h2>
+    <div class="cols">
+      <div class="col wide">
+        <div class="figure"><img src="assets/results/gme_mitigation_sweep.png" alt="GME mitigation sweep"></div>
+        <p class="fig-cap">Raw → +QREM → +ZNE → +QREM+ZNE (clipped at physical max W=n) on both devices.</p>
+      </div>
+      <div class="col">
+        <h3>Garnet headline</h3>
+        <table>
+          <tr><th>n</th><th>bound</th><th>W +QREM</th><th>σ</th></tr>
+          <tr><td>6</td><td>5</td><td>6.04</td><td class="win">+19σ</td></tr>
+          <tr><td>12</td><td>11</td><td>11.98</td><td class="win">+13σ</td></tr>
+          <tr class="hi-row"><td><b>20</b></td><td><b>19</b></td><td class="hi"><b>19.25</b></td><td class="hi" id="qrem20-sigma"><b>+2.5σ</b></td></tr>
+        </table>
+        <h3 style="margin-top:18px;">Mitigation stack</h3>
+        <ul>
+          <li><b>Parity-QREM</b> — c<sub>q</sub> = 1/(1−e<sub>01</sub>−e<sub>10</sub>) from device metrics, no extra cal shots</li>
+          <li><b>ZNE</b> — CZ folding (with barriers!) at α ∈ {1, 3, 5}</li>
+          <li><b>Bootstrap σ</b> — 200 shot-level resamples through QREM and the linear fit</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 · Anna's edge map -->
+  <section id="s8-bottleneck" class="panel">
+    <span class="slide-num">08 / 10</span>
+    <span class="tag teal">Part 2.4 · Anna's edge-Bell map</span>
+    <h2>Measure every native CZ pair, then let the data pick the tree.</h2>
+    <div class="cols">
+      <div class="col">
+        <p>For every native CZ edge, prepare CZ|+⟩|+⟩ and measure</p>
+        <div class="formula" style="font-size:16px;">F<sub>ij</sub> = (1 + ⟨X<sub>i</sub>Z<sub>j</sub>⟩ + ⟨Z<sub>i</sub>X<sub>j</sub>⟩ + ⟨Y<sub>i</sub>Y<sub>j</sub>⟩) / 4</div>
+        <p style="margin-top:8px;">Greedy edge-coloring → matchings → all 30 Garnet edges measured in <em>4 parallel circuits</em>.</p>
+        <p>Plug w(i,j) = 1 − F<sub>ij</sub><sup>measured</sup> into the same Prim's MST.</p>
+        <h3 style="margin-top:14px;">Hardware verdict (same n)</h3>
+        <table>
+          <tr><th>device</th><th>n</th><th>method</th><th>W +QREM</th><th>F<sub>lb</sub></th></tr>
+          <tr><td>Garnet</td><td>12</td><td>cal</td><td>11.88</td><td>+0.46</td></tr>
+          <tr><td>Garnet</td><td>12</td><td><b>emp</b></td><td class="win">12.07</td><td class="win">+0.50</td></tr>
+          <tr><td>Emerald</td><td>20</td><td>cal</td><td>18.12</td><td class="hi">−0.20</td></tr>
+          <tr><td>Emerald</td><td>20</td><td><b>emp</b></td><td class="win">18.69</td><td class="win">+0.11</td></tr>
+        </table>
+        <p style="margin-top:8px;">Empirical-F tree <em>flips</em> Emerald n=20 fidelity bound from negative to positive.</p>
+      </div>
+      <div class="col">
+        <div class="figure"><img src="assets/results/bottleneck_emerald.png" alt="Emerald bottleneck"></div>
+        <p class="fig-cap">Emerald bottleneck map · weakest QB35–QB43 in red</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 · Routed Bell MBQC -->
+  <section id="s9-mbqc" class="panel">
+    <span class="slide-num">09 / 10</span>
+    <span class="tag coral">Part 3 · Routed Bell pair</span>
+    <h2>Use the cluster as a teleportation resource.</h2>
+    <div class="cols">
+      <div class="col tight">
+        <p>Pick a path A — q₁ — … — B through the cluster. Measure all internals in <em>X</em>. What remains on (A, B) is locally equivalent to |Φ⁺⟩, modulo a Pauli byproduct from the internal outcomes.</p>
+        <div class="formula coral" style="font-size:18px;">F = (1 + ⟨XX⟩<sub>c</sub> + ⟨YY⟩<sub>c</sub> + ⟨ZZ⟩<sub>c</sub>) / 4</div>
+        <table style="margin-top:14px;">
+          <tr><th>L</th><th>F (with CZ)</th><th>F (no-CZ)</th><th>|S| (with)</th></tr>
+          <tr><td>3</td><td class="win">0.895</td><td>0.494</td><td class="win">2.50</td></tr>
+          <tr><td>5</td><td class="win">0.819</td><td>0.493</td><td class="win">2.22</td></tr>
+          <tr><td>7</td><td class="win">0.743</td><td>0.495</td><td>1.92</td></tr>
+        </table>
+        <p style="margin-top:10px;font-size:15px;">Bell entanglement at every L; CHSH violates classical bound at L=3, 5.</p>
+      </div>
+      <div class="col wide">
+        <div class="mbqc-stage">
+          <div class="mbqc-frame-label" id="mbqc-label">1 · cluster prep</div>
+          <svg class="mbqc-svg" id="mbqc-svg" viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg">
+            <!-- Path L=7: A=q8, q7, q12, q13, q17, q18, B=q19 -->
+            <!-- Links -->
+            <line class="link" id="link-0" x1="80" y1="160" x2="200" y2="160"/>
+            <line class="link" id="link-1" x1="200" y1="160" x2="320" y2="160"/>
+            <line class="link" id="link-2" x1="320" y1="160" x2="440" y2="160"/>
+            <line class="link" id="link-3" x1="440" y1="160" x2="560" y2="160"/>
+            <line class="link" id="link-4" x1="560" y1="160" x2="680" y2="160"/>
+            <line class="link" id="link-5" x1="680" y1="160" x2="800" y2="160"/>
+            <!-- Hadamard halos -->
+            <circle class="haha" id="halo-0" cx="80" cy="160" r="38"/>
+            <circle class="haha" id="halo-1" cx="200" cy="160" r="38"/>
+            <circle class="haha" id="halo-2" cx="320" cy="160" r="38"/>
+            <circle class="haha" id="halo-3" cx="440" cy="160" r="38"/>
+            <circle class="haha" id="halo-4" cx="560" cy="160" r="38"/>
+            <circle class="haha" id="halo-5" cx="680" cy="160" r="38"/>
+            <circle class="haha" id="halo-6" cx="800" cy="160" r="38"/>
+            <!-- Qubits -->
+            <circle class="qubit A" id="q-0" cx="80" cy="160" r="26"/>
+            <circle class="qubit" id="q-1" cx="200" cy="160" r="26"/>
+            <circle class="qubit" id="q-2" cx="320" cy="160" r="26"/>
+            <circle class="qubit" id="q-3" cx="440" cy="160" r="26"/>
+            <circle class="qubit" id="q-4" cx="560" cy="160" r="26"/>
+            <circle class="qubit" id="q-5" cx="680" cy="160" r="26"/>
+            <circle class="qubit B" id="q-6" cx="800" cy="160" r="26"/>
+            <text class="qlabel white" x="80" y="160">A</text>
+            <text class="qlabel" x="200" y="160">q₁</text>
+            <text class="qlabel" x="320" y="160">q₂</text>
+            <text class="qlabel" x="440" y="160">q₃</text>
+            <text class="qlabel" x="560" y="160">q₄</text>
+            <text class="qlabel" x="680" y="160">q₅</text>
+            <text class="qlabel white" x="800" y="160">B</text>
+            <!-- Outcome labels (revealed in frame 2) -->
+            <text class="outcome" id="out-1" x="200" y="120">+1</text>
+            <text class="outcome" id="out-2" x="320" y="120">−1</text>
+            <text class="outcome" id="out-3" x="440" y="120">+1</text>
+            <text class="outcome" id="out-4" x="560" y="120">+1</text>
+            <text class="outcome" id="out-5" x="680" y="120">−1</text>
+            <!-- Pauli byproduct (revealed in frame 3) -->
+            <text class="pauli" id="pauli-string" x="800" y="225">P(m) = Z² X¹ → byproduct</text>
+            <!-- Endpoint Bell label (revealed in frame 4) -->
+            <text class="bell" id="bell-state" x="440" y="270">|Φ⁺⟩ on (A, B) up to byproduct</text>
+            <text class="fcap" id="fcap" x="440" y="298">F = 0.74 · 3σ entangled · CHSH near classical bound</text>
+          </svg>
+        </div>
+        <p class="fig-cap" style="margin-top:8px;">Scroll within this panel ↓ to step through the protocol</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 · Summary -->
+  <section id="s10-summary" class="panel">
+    <span class="slide-num">10 / 10</span>
+    <span class="tag">Summary</span>
+    <h2>What we shipped.</h2>
+    <div class="cols">
+      <div class="col">
+        <h3>Variety — 4 different witnesses</h3>
+        <table class="variety">
+          <tr><th>Witness</th><th>State</th><th>Devices</th></tr>
+          <tr><td><b>Pairwise X-correlator</b></td><td>W states</td><td>Emerald + Garnet</td></tr>
+          <tr><td><b>Tóth–Gühne stabilizer sum</b></td><td>Tree graph state</td><td>Emerald + Garnet</td></tr>
+          <tr><td><b>Bell-equivalence F &gt; 0.5</b></td><td>Edge graph state</td><td>both, every CZ pair</td></tr>
+          <tr><td><b>Bell fidelity + CHSH</b></td><td>Routed Bell pair</td><td>Garnet, L = 3, 5, 7</td></tr>
+        </table>
+        <h3 style="margin-top:14px;">Headline qubit counts</h3>
+        <ul>
+          <li><em>20-qubit GME</em> on the full Garnet chip · +QREM at +2.5σ · +QREM+ZNE at +15σ</li>
+          <li><em>20-qubit GME</em> on Emerald with empirical-F tree · F<sub>lb</sub> &gt; 0</li>
+          <li><em>n=19 W-state</em> non-classicality at +25σ on both devices</li>
+          <li><em>L=5 routed Bell + CHSH</em> on Garnet · |S| = 2.22 above classical 2</li>
+        </ul>
+      </div>
+      <div class="col">
+        <h3>Implementation pieces</h3>
+        <ul>
+          <li>Beam-search Hamiltonian-path routing</li>
+          <li>Threshold-filtered multi-start Prim's MST + edge-swap refinement</li>
+          <li>Parity-QREM with no extra cal shots</li>
+          <li>ZNE with barriers + bootstrap σ through QREM and the linear fit</li>
+          <li>Edge-coloring → all CZ edges measured in parallel</li>
+          <li>Empirical-F tree selection (Anna's edge-Bell map)</li>
+          <li>Cluster-MBQC routed Bell pair with byproduct correction + CHSH</li>
+        </ul>
+        <div style="margin-top:24px;text-align:center;">
+          <img src="assets/qte_logo_wordmark_1024.png" style="max-width:55%;">
+          <p style="margin-top:18px;font-size:14px;color:#666;">Code, figures, saved JSONs · <span class="pill">github.com/GrigoVyd/iqm_qte</span> · branch <span class="pill">submission</span></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Brand footer (hidden on cover) -->
+<div class="brand-footer" id="brand-footer"></div>
+
+<!-- Dot navigation -->
+<nav class="dots" id="dots"></nav>
+
+<!-- Fullscreen toggle -->
+<button id="fs" title="Fullscreen (F)">⛶</button>
+
+<!-- Inlined data for animations -->
+<script type="application/json" id="data-tree-garnet">
+{
+ "qubits": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19],
+ "edges_in_order": [[15,14],[14,9],[15,10],[10,5],[5,6],[15,16],[15,19],[19,18],[18,17],[17,13],[16,11],[9,8],[9,4],[8,7],[8,3],[7,12],[7,2],[4,1],[1,0]],
+ "predicted_W": 18.44
+}
+</script>
+<script type="application/json" id="data-mbqc">
+{
+ "L": 7,
+ "path": [8,7,12,13,17,18,19],
+ "outcomes": [0, 1, 0, 0, 1],
+ "F": 0.7425,
+ "S": 1.918
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/animejs@3.2.2/lib/anime.min.js"></script>
+<script src="chip.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
